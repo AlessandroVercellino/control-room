@@ -1,0 +1,701 @@
+{
+  "version" : {
+    "major" : 5,
+    "minor" : 17,
+    "patch" : 1,
+    "build" : "9439",
+    "component" : "DATABASE"
+  },
+  "payloadProfiles" : [ {
+    "name" : "DJI Zenmuse H20T (Thermal)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_h20t",
+    "parameters" : {
+      "weight" : 0.828,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.0135,
+      "sensorWidth" : 0.00814655,
+      "sensorHeight" : 0.00651724,
+      "sensorHorizontalPixels" : 640.0,
+      "sensorVerticalPixels" : 512.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse H20T/H20 (Wide)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_h20t",
+    "parameters" : {
+      "weight" : 0.828,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.0045,
+      "sensorWidth" : 0.0065625,
+      "sensorHeight" : 0.00491864,
+      "sensorHorizontalPixels" : 4056.0,
+      "sensorVerticalPixels" : 3040.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse H20T/H20 (Zoom)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_h20t",
+    "parameters" : {
+      "weight" : 0.828,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.00683,
+      "sensorWidth" : 0.0095,
+      "sensorHeight" : 0.0057,
+      "sensorHorizontalPixels" : 5184.0,
+      "sensorVerticalPixels" : 3888.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse H30T/H30 (Zoom)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_h20t",
+    "parameters" : {
+      "weight" : 0.92,
+      "frequency" : null,
+      "power" : null,
+      "trueFocalLength" : 0.0070999999999999995,
+      "sensorWidth" : 0.00718,
+      "sensorHeight" : 0.00532,
+      "sensorHorizontalPixels" : 7328.0,
+      "sensorVerticalPixels" : 5496.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse H30T (Thermal)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_h20t",
+    "parameters" : {
+      "weight" : 0.92,
+      "frequency" : null,
+      "power" : null,
+      "trueFocalLength" : 0.024,
+      "sensorWidth" : 0.01536,
+      "sensorHeight" : 0.01228,
+      "sensorHorizontalPixels" : 1280.0,
+      "sensorVerticalPixels" : 1024.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse P1 (24 mm)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_p1_24",
+    "parameters" : {
+      "weight" : 0.8,
+      "frequency" : 0.0,
+      "power" : 20.0,
+      "trueFocalLength" : 0.024,
+      "sensorWidth" : 0.0359,
+      "sensorHeight" : 0.024,
+      "sensorHorizontalPixels" : 8192.0,
+      "sensorVerticalPixels" : 5460.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse H30T/H30 (Wide)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_h20t",
+    "parameters" : {
+      "weight" : 0.92,
+      "frequency" : null,
+      "power" : null,
+      "trueFocalLength" : 0.00672,
+      "sensorWidth" : 0.0048,
+      "sensorHeight" : 0.0036000000000000003,
+      "sensorHorizontalPixels" : 4032.0,
+      "sensorVerticalPixels" : 3024.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse P1 (35 mm)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_p1_35",
+    "parameters" : {
+      "weight" : 0.8,
+      "frequency" : 0.0,
+      "power" : 20.0,
+      "trueFocalLength" : 0.035,
+      "sensorWidth" : 0.0359,
+      "sensorHeight" : 0.024,
+      "sensorHorizontalPixels" : 8192.0,
+      "sensorVerticalPixels" : 5460.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse P1 (50 mm)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_p1_50",
+    "parameters" : {
+      "weight" : 0.8,
+      "frequency" : 0.0,
+      "power" : 20.0,
+      "trueFocalLength" : 0.05,
+      "sensorWidth" : 0.0359,
+      "sensorHeight" : 0.024,
+      "sensorHorizontalPixels" : 8192.0,
+      "sensorVerticalPixels" : 5460.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse L1 (3:2)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_l1",
+    "parameters" : {
+      "weight" : 0.93,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.014,
+      "sensorWidth" : 0.0211,
+      "sensorHeight" : 0.0141,
+      "sensorHorizontalPixels" : 5472.0,
+      "sensorVerticalPixels" : 3648.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse L1 (16:9)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_l1",
+    "parameters" : {
+      "weight" : 0.93,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.014,
+      "sensorWidth" : 0.0211,
+      "sensorHeight" : 0.0119,
+      "sensorHorizontalPixels" : 5472.0,
+      "sensorVerticalPixels" : 3078.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse L1 (4:3)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_l1",
+    "parameters" : {
+      "weight" : 0.93,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.014,
+      "sensorWidth" : 0.0188,
+      "sensorHeight" : 0.0141,
+      "sensorHorizontalPixels" : 4864.0,
+      "sensorVerticalPixels" : 3648.0,
+      "minTriggeringInterval" : 1.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse H20N (Wide)",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_h20n",
+    "parameters" : {
+      "weight" : 0.88,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.0045000000000000005,
+      "sensorWidth" : 0.0057599999999999995,
+      "sensorHeight" : 0.0032400000000000003,
+      "sensorHorizontalPixels" : 1920.0,
+      "sensorVerticalPixels" : 1080.0,
+      "minTriggeringInterval" : 3.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Mini 4 Pro camera",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_mini",
+    "parameters" : {
+      "weight" : 0.05,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.00672,
+      "sensorWidth" : 0.00936,
+      "sensorHeight" : 0.00702,
+      "sensorHorizontalPixels" : 4032.0,
+      "sensorVerticalPixels" : 3024.0,
+      "minTriggeringInterval" : 2.0,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  }, {
+    "name" : "DJI Zenmuse L2",
+    "code" : null,
+    "shortName" : null,
+    "payloadType" : "CAMERA",
+    "imageKey" : "dji_zenmuse_l2",
+    "parameters" : {
+      "weight" : 0.9,
+      "frequency" : 0.0,
+      "power" : 0.0,
+      "trueFocalLength" : 0.012,
+      "sensorWidth" : 0.0174,
+      "sensorHeight" : 0.013,
+      "sensorHorizontalPixels" : 5280.0,
+      "sensorVerticalPixels" : 3956.0,
+      "minTriggeringInterval" : 0.7,
+      "scanningFov" : null,
+      "scanningRange" : null,
+      "scanningSpeed" : null
+    }
+  } ],
+  "vehicleProfiles" : [ {
+    "name" : "DJI Mini 4 Pro",
+    "code" : null,
+    "vehicleType" : "MULTICOPTER",
+    "modelKey" : "default",
+    "imageKey" : "dji_mini_4_pro",
+    "platformCode" : "DjiMini4Pro",
+    "primary" : true,
+    "payloadProfiles" : [ "DJI Mini 4 Pro camera" ],
+    "parameters" : {
+      "height" : 0.101,
+      "width" : 0.373,
+      "length" : 0.298,
+      "maxClimbRate" : 3.0,
+      "maxHorizontalSpeed" : 13.0,
+      "maxAltitude" : 4000.0,
+      "maxWaypoints" : 65535.0,
+      "maxFlightTime" : 2040.0,
+      "windResistance" : 10.7,
+      "dryTakeoffWeight" : 0.249,
+      "maxTakeoffWeight" : 0.249,
+      "batteryWeight" : 0.095,
+      "chargedBatteryVoltage" : 12.6,
+      "dischargedBatteryVoltage" : 9.5,
+      "normalBatteryVoltage" : 10.5,
+      "lowBatteryVoltage" : 10.0,
+      "lowGpsSatellites" : 7.0,
+      "normalGpsSatellites" : 9.0,
+      "safeDistanceToTerrain" : 5.0,
+      "safeDistanceToObstacle" : 20.0,
+      "waypointAcceptanceRadius" : 2.0,
+      "fenceRadius" : 2500.0,
+      "fenceAltitude" : 150.0,
+      "lowTelemetryLevel" : 50.0,
+      "normalTelemetryLevel" : 70.0,
+      "defaultClimbRate" : 2.0,
+      "defaultDescentRate" : 1.0,
+      "glideSlope" : null,
+      "defaultHorizontalSpeed" : 5.0,
+      "landingGroundSpeed" : null,
+      "maxAltitudeAgl" : 120.0,
+      "landingFlareAltitude" : null,
+      "landingFlareTime" : null,
+      "minLandingPitch" : null,
+      "landingFlareDamp" : null,
+      "landingApproachAirspeed" : null,
+      "landingSpeedWeighting" : null,
+      "maxAutoFlightPitch" : null,
+      "maxPitch" : null,
+      "minThrottle" : null,
+      "landingSinkRate" : null,
+      "landingRangefinderEnabled" : null,
+      "minRangefinderDistance" : null,
+      "maxDescentRate" : 3.0,
+      "lowBatteryPowerLevel" : 30.0,
+      "normalBatteryPowerLevel" : 40.0,
+      "maxRangefinderDistance" : null,
+      "minDistanceBetweenWaypoint" : 1.0,
+      "initialSpeed" : 5.0,
+      "waypointMaxWaitTime" : 25.5,
+      "cornerRadius" : 20.0
+    }
+  }, {
+    "name" : "DJI Matrice 350 RTK",
+    "code" : null,
+    "vehicleType" : "MULTICOPTER",
+    "modelKey" : "dji_matrice_300",
+    "imageKey" : "dji_matrice_300",
+    "platformCode" : "DjiMatrice350RTK",
+    "primary" : true,
+    "payloadProfiles" : [ "DJI Zenmuse H20T/H20 (Wide)", "DJI Zenmuse H20T/H20 (Zoom)", "DJI Zenmuse H20T (Thermal)", "DJI Zenmuse P1 (24 mm)", "DJI Zenmuse P1 (35 mm)", "DJI Zenmuse P1 (50 mm)", "DJI Zenmuse L1 (16:9)", "DJI Zenmuse L1 (3:2)", "DJI Zenmuse L1 (4:3)", "DJI Zenmuse L2", "DJI Zenmuse H20N (Wide)", "DJI Zenmuse H30T (Thermal)", "DJI Zenmuse H30T/H30 (Wide)", "DJI Zenmuse H30T/H30 (Zoom)" ],
+    "parameters" : {
+      "height" : 0.43,
+      "width" : 0.67,
+      "length" : 0.81,
+      "maxClimbRate" : 6.0,
+      "maxHorizontalSpeed" : 15.0,
+      "maxAltitude" : 5000.0,
+      "maxWaypoints" : 65535.0,
+      "maxFlightTime" : 3300.0,
+      "windResistance" : 12.0,
+      "dryTakeoffWeight" : 6.47,
+      "maxTakeoffWeight" : 9.2,
+      "batteryWeight" : 1.35,
+      "chargedBatteryVoltage" : null,
+      "dischargedBatteryVoltage" : null,
+      "normalBatteryVoltage" : null,
+      "lowBatteryVoltage" : null,
+      "lowGpsSatellites" : 7.0,
+      "normalGpsSatellites" : 9.0,
+      "safeDistanceToTerrain" : 5.0,
+      "safeDistanceToObstacle" : 20.0,
+      "waypointAcceptanceRadius" : 4.0,
+      "fenceRadius" : 2500.0,
+      "fenceAltitude" : 150.0,
+      "lowTelemetryLevel" : 50.0,
+      "normalTelemetryLevel" : 70.0,
+      "defaultClimbRate" : 2.0,
+      "defaultDescentRate" : 1.0,
+      "glideSlope" : null,
+      "defaultHorizontalSpeed" : 5.0,
+      "landingGroundSpeed" : null,
+      "maxAltitudeAgl" : 1500.0,
+      "landingFlareAltitude" : null,
+      "landingFlareTime" : null,
+      "minLandingPitch" : null,
+      "landingFlareDamp" : null,
+      "landingApproachAirspeed" : null,
+      "landingSpeedWeighting" : null,
+      "maxAutoFlightPitch" : null,
+      "maxPitch" : null,
+      "minThrottle" : null,
+      "landingSinkRate" : null,
+      "landingRangefinderEnabled" : null,
+      "minRangefinderDistance" : null,
+      "maxDescentRate" : 5.0,
+      "lowBatteryPowerLevel" : null,
+      "normalBatteryPowerLevel" : null,
+      "maxRangefinderDistance" : 30.0,
+      "minDistanceBetweenWaypoint" : 1.0,
+      "initialSpeed" : 5.0,
+      "waypointMaxWaitTime" : 25.5,
+      "cornerRadius" : 20.0
+    }
+  } ],
+  "vehicles" : [ ],
+  "mission" : {
+    "name" : "Rilevamento VOC vento nord",
+    "description" : "",
+    "creationTime" : 1777452408272,
+    "routes" : [ {
+      "name" : "Route 1",
+      "creationTime" : 1777452417647,
+      "scheduledTime" : null,
+      "startDelay" : null,
+      "vehicleProfile" : "DJI Matrice 350 RTK",
+      "trajectoryType" : null,
+      "safeAltitude" : 50.0,
+      "maxAltitude" : 1500.0,
+      "initialSpeed" : 5.0,
+      "maxSpeed" : null,
+      "failsafes" : {
+        "rcLost" : "GO_HOME",
+        "gpsLost" : null,
+        "lowBattery" : null,
+        "datalinkLost" : null
+      },
+      "checkAerodromeNfz" : false,
+      "checkCustomNfz" : false,
+      "segments" : [ {
+        "type" : "Waypoint",
+        "actions" : [ ],
+        "point" : {
+          "latitude" : 0.7755366087060098,
+          "longitude" : 0.15501515762280832,
+          "altitude" : 45.0,
+          "altitudeType" : "AGL"
+        },
+        "parameters" : {
+          "avoidObstacles" : true,
+          "avoidTerrain" : true,
+          "speed" : 5.0,
+          "wpTurnType" : "STOP_AND_TURN",
+          "altitudeType" : "AGL",
+          "cornerRadius" : null
+        }
+      }, {
+        "type" : "Waypoint",
+        "actions" : [ ],
+        "point" : {
+          "latitude" : 0.7755722282753856,
+          "longitude" : 0.15499126926669635,
+          "altitude" : 45.0,
+          "altitudeType" : "AGL"
+        },
+        "parameters" : {
+          "avoidObstacles" : true,
+          "avoidTerrain" : true,
+          "speed" : 5.0,
+          "wpTurnType" : "STOP_AND_TURN",
+          "altitudeType" : "AGL",
+          "cornerRadius" : null
+        }
+      }, {
+        "type" : "AreaScan",
+        "actions" : [ ],
+        "polygon" : {
+          "points" : [ {
+            "latitude" : 0.7755761745552903,
+            "longitude" : 0.15498585963685185,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755774911090372,
+            "longitude" : 0.1549947055850159,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755748346488773,
+            "longitude" : 0.15499954089956158,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755676370649227,
+            "longitude" : 0.1549974962958402,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755632651028961,
+            "longitude" : 0.15499409706258693,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755624555073641,
+            "longitude" : 0.15498551460905172,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755665565400114,
+            "longitude" : 0.15498109483307598,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755697798353198,
+            "longitude" : 0.1549818192963926,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755726701624939,
+            "longitude" : 0.15498338693309596,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755761745552903,
+            "longitude" : 0.15498585963685185,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          } ]
+        },
+        "parameters" : {
+          "speed" : 1.0,
+          "wpTurnType" : "STOP_AND_TURN",
+          "height" : 35.0,
+          "altitudeType" : "SMART_AGL",
+          "sideDistance" : 10.0,
+          "directionAngle" : 93.3269119262695,
+          "avoidObstacles" : true,
+          "actionExecution" : "ACTIONS_EVERY_POINT",
+          "overshoot" : null,
+          "overshootSpeed" : null,
+          "areaScanAllowPartialCalculation" : false,
+          "tolerance" : 3.0,
+          "minGap" : null,
+          "maxSlope" : null,
+          "doubleGrid" : false
+        }
+      } ],
+      "takeoffHeight" : null,
+      "cornerRadius" : 20.0
+    }, {
+      "name" : "Route 2",
+      "creationTime" : 1777452417647,
+      "scheduledTime" : null,
+      "startDelay" : null,
+      "vehicleProfile" : "DJI Mini 4 Pro",
+      "trajectoryType" : null,
+      "safeAltitude" : 50.0,
+      "maxAltitude" : 1500.0,
+      "initialSpeed" : 5.0,
+      "maxSpeed" : 0.0,
+      "failsafes" : {
+        "rcLost" : "GO_HOME",
+        "gpsLost" : null,
+        "lowBattery" : null,
+        "datalinkLost" : null
+      },
+      "checkAerodromeNfz" : false,
+      "checkCustomNfz" : false,
+      "segments" : [ {
+        "type" : "Waypoint",
+        "actions" : [ ],
+        "point" : {
+          "latitude" : 0.7755366087060098,
+          "longitude" : 0.15501515762280832,
+          "altitude" : 45.0,
+          "altitudeType" : "AGL"
+        },
+        "parameters" : {
+          "avoidObstacles" : true,
+          "avoidTerrain" : true,
+          "speed" : 5.0,
+          "wpTurnType" : "STOP_AND_TURN",
+          "altitudeType" : "AGL",
+          "cornerRadius" : null
+        }
+      }, {
+        "type" : "Waypoint",
+        "actions" : [ ],
+        "point" : {
+          "latitude" : 0.7755722282753856,
+          "longitude" : 0.15499126926669635,
+          "altitude" : 45.0,
+          "altitudeType" : "AGL"
+        },
+        "parameters" : {
+          "avoidObstacles" : true,
+          "avoidTerrain" : true,
+          "speed" : 5.0,
+          "wpTurnType" : "STOP_AND_TURN",
+          "altitudeType" : "AGL",
+          "cornerRadius" : null
+        }
+      }, {
+        "type" : "AreaScan",
+        "actions" : [ ],
+        "polygon" : {
+          "points" : [ {
+            "latitude" : 0.7755761745552903,
+            "longitude" : 0.15498585963685185,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755774911090372,
+            "longitude" : 0.1549947055850159,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755748346488773,
+            "longitude" : 0.15499954089956158,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755676370649227,
+            "longitude" : 0.1549974962958402,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755632651028961,
+            "longitude" : 0.15499409706258693,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755624555073641,
+            "longitude" : 0.15498551460905172,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755665565400114,
+            "longitude" : 0.15498109483307598,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755697798353198,
+            "longitude" : 0.1549818192963926,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755726701624939,
+            "longitude" : 0.15498338693309596,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          }, {
+            "latitude" : 0.7755761745552903,
+            "longitude" : 0.15498585963685185,
+            "altitude" : 0.0,
+            "altitudeType" : "AGL"
+          } ]
+        },
+        "parameters" : {
+          "speed" : 1.0,
+          "wpTurnType" : "STOP_AND_TURN",
+          "height" : 35.0,
+          "altitudeType" : "SMART_AGL",
+          "sideDistance" : 10.0,
+          "directionAngle" : 93.3269119262695,
+          "avoidObstacles" : true,
+          "actionExecution" : "ACTIONS_EVERY_POINT",
+          "overshoot" : null,
+          "overshootSpeed" : null,
+          "areaScanAllowPartialCalculation" : false,
+          "tolerance" : 3.0,
+          "minGap" : null,
+          "maxSlope" : null,
+          "doubleGrid" : false
+        }
+      } ],
+      "takeoffHeight" : null,
+      "cornerRadius" : 20.0
+    } ],
+    "vehicles" : [ ]
+  }
+}
