@@ -27,7 +27,8 @@ def setup_database():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         route_name TEXT NOT NULL,
         file_kmz_path TEXT NOT NULL,
-        waypoints TEXT NOT NULL 
+        waypoints TEXT NOT NULL,
+        details TEXT
     )''')
 
     cursor.execute('''

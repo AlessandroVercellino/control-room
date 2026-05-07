@@ -31,6 +31,32 @@ def extract_waypoints(data):
     search_points(data)
     return points
 
+# NEW: Extracts extra technical data from the UgCS JSON
+def extract_mission_details(data, waypoints_count):
+    max_alt = 0.0
+    
+    def find_alt(obj):
+        nonlocal max_alt
+        if isinstance(obj, dict):
+            if 'altitude' in obj and isinstance(obj['altitude'], (int, float)):
+                if obj['altitude'] > max_alt:
+                    max_alt = obj['altitude']
+            for v in obj.values():
+                find_alt(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                find_alt(item)
+                
+    find_alt(data)
+    
+    details = {
+        "max_altitude_m": round(max_alt, 1),
+        "total_waypoints": waypoints_count,
+        "source_software": "UgCS",
+        "flight_type": "Automated 3D Mapping" if max_alt > 20 else "Low Altitude Inspection"
+    }
+    return details
+
 def scan_and_import():
     if not os.path.exists(MISSIONS_DIR):
         print(f"Error: Folder '{MISSIONS_DIR}' not found.")
@@ -61,10 +87,15 @@ def scan_and_import():
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
             waypoints = extract_waypoints(data)
+            
+            # Extract details and convert to JSON string
+            details_dict = extract_mission_details(data, len(waypoints))
+            
             waypoints_json = json.dumps(waypoints)
+            details_json = json.dumps(details_dict)
 
-            cursor.execute("INSERT INTO Flight_Plans (route_name, file_kmz_path, waypoints) VALUES (?, ?, ?)", 
-                           (route_name, filename, waypoints_json))
+            cursor.execute("INSERT INTO Flight_Plans (route_name, file_kmz_path, waypoints, details) VALUES (?, ?, ?, ?)", 
+                           (route_name, filename, waypoints_json, details_json))
             plan_id = cursor.lastrowid
 
             cursor.execute('''
@@ -72,7 +103,7 @@ def scan_and_import():
                 VALUES (?, ?, ?, 'Pending', CURRENT_TIMESTAMP)
             ''', (plan_id, drone[0], pilot[0]))
 
-            print(f"✅ Auto-Imported: '{route_name}' ({len(waypoints)} waypoints)")
+            print(f"✅ Auto-Imported: '{route_name}' ({len(waypoints)} waypoints, Max Alt: {details_dict['max_altitude_m']}m)")
             
     conn.commit()
     conn.close()

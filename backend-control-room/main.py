@@ -22,8 +22,9 @@ def get_missions():
     conn = sqlite3.connect('control_room.db')
     cursor = conn.cursor()
     
+    # LA QUERY CORRETTA CHE ESTRAE 7 COLONNE (Compresa 'details')
     cursor.execute('''
-    SELECT Missions.id, Users.full_name, Drones.name, Flight_Plans.route_name, Missions.status, Flight_Plans.waypoints
+    SELECT Missions.id, Users.full_name, Drones.name, Flight_Plans.route_name, Missions.status, Flight_Plans.waypoints, Flight_Plans.details
     FROM Missions
     JOIN Users ON Missions.pilot_id = Users.id
     JOIN Drones ON Missions.drone_id = Drones.id
@@ -36,6 +37,7 @@ def get_missions():
     mission_list = []
     for m in raw_missions:
         waypoints_array = json.loads(m[5]) if m[5] else []
+        details_obj = json.loads(m[6]) if m[6] else {}
         
         mission_list.append({
             "mission_id": m[0],
@@ -43,7 +45,8 @@ def get_missions():
             "drone": m[2],
             "route": m[3],
             "status": m[4],
-            "waypoints": waypoints_array
+            "waypoints": waypoints_array,
+            "details": details_obj
         })
         
     return mission_list
