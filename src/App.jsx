@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 
 // 1. IMPORTIAMO LE EMERGENZE LOCALMENTE (Il Database non c'entra, sicurezza al 100%)
 import emergenzaData from './data/ugcs/emergenza.json';
+import Login from './Login';
 //import RTH from './data/ugcs/rth.json';
 
 function extractUgcsWaypoints(ugcsJson) {
@@ -49,22 +50,46 @@ export default function App() {
   const [activeMission, setActiveMission] = useState(null);
   const [serverMissions, setServerMissions] = useState([]);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const mapCenter = [44.437475, 8.880381];
+  const [token, setToken] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const handleLoginSuccess = (jwtToken, role) => {
+    setToken(jwtToken);
+    setUserRole(role);
+  };
+  const handleLogout = () => {
+    setToken(null);
+    setUserRole(null);
+  };
 
   useEffect(() => {
+    // 1. Definiamo la funzione asincrona internamente
     const fetchMissions = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/missions');
+        const response = await fetch('http://127.0.0.1:8000/api/missions', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         const data = await response.json();
         setServerMissions(data);
       } catch (error) {
         console.error("Connection error to Python server:", error);
       }
     };
-    fetchMissions();
-  }, []);
 
+    // 2. Eseguiamo la funzione SOLO se c'è un token valido
+    if (token) {
+      fetchMissions();
+    }
+    
+  // 3. Il token va qui, nelle parentesi quadre finali
+  }, [token]);
+  
+  if (!token) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
   return (
     <div className="h-screen w-screen bg-neutral-900 text-white flex p-2 gap-2 font-sans overflow-hidden relative">
       
@@ -160,6 +185,15 @@ export default function App() {
 
       {/* SEZIONE DESTRA (Sidebar) */}
       <div className="w-96 flex flex-col gap-2">
+        {/* HEADER UTENTE */}
+        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-3 flex justify-between items-center">
+          <span className="text-sm">
+            Ruolo: <span className="text-blue-400 uppercase font-bold">{userRole}</span>
+          </span>
+          <button onClick={handleLogout} className="bg-red-900/80 hover:bg-red-800 text-xs px-2 py-1 rounded transition border border-red-700">
+            Disconnetti
+          </button>
+        </div>
         
         {/* LISTA MISSIONI (Database) */}
         <div className="h-[55%] bg-neutral-800 border border-neutral-700 rounded-lg p-4 flex flex-col gap-2 overflow-y-auto">
@@ -208,6 +242,7 @@ export default function App() {
         </div>
 
         {/* COMANDI DI EMERGENZA (Sempre visibili e indipendenti dal DB) */}
+        {userRole !== "spettatore" && (
         <div className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg p-4 flex flex-col overflow-y-auto">
           <h2 className="text-red-500 font-bold mb-3 border-b border-red-900/50 pb-2 flex items-center gap-2">
             🚨 Protocolli Failsafe
@@ -238,7 +273,7 @@ export default function App() {
             ))}
           </div>
         </div>
-
+        )}
       </div>
     </div>
   );
