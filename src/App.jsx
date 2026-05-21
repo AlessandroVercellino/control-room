@@ -88,6 +88,60 @@ const handleLoginSuccess = (jwtToken, role) => {
     localStorage.removeItem('control_room_role');
   };
 
+  // --- INIZIO LOGICA TELEGRAM WORKFLOW ---
+  const [missionPhase, setMissionPhase] = useState('IDLE'); // IDLE, AWAITING_APPROVAL, READY
+  const [approvals, setApprovals] = useState({ pilot: false, manager: false });
+
+  const handleRequestDispatch = async (e) => {
+    e.stopPropagation(); // Evita di ricaricare la mappa quando clicchi il bottone
+    setMissionPhase('AWAITING_APPROVAL');
+    setApprovals({ pilot: false, manager: false });
+    try {
+      await fetch("http://127.0.0.1:8000/api/mission/request-clearance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mission_id: activeMission.id, mission_name: activeMission.name })
+      });
+    } catch (err) { console.error("Errore Telegram:", err); }
+  };
+
+  const handleManagerApprove = async (e) => {
+    e.stopPropagation();
+    try {
+      await fetch(`http://127.0.0.1:8000/api/mission/approve-manager/${activeMission.id}`, { method: "POST" });
+      setApprovals(prev => ({ ...prev, manager: true }));
+    } catch (err) { console.error(err); }
+  };
+
+  const handleUploadAndLaunch = (e) => {
+    e.stopPropagation();
+    alert("🚀 PIANO DI VOLO CARICATO SUL DRONE! Inizio sequenza di armamento...");
+    setMissionPhase('IDLE'); // Resetta l'interfaccia
+  };
+
+  // Polling: Controlla ogni secondo se hai cliccato sul telefono
+  useEffect(() => {
+    let interval = null;
+    if (missionPhase === 'AWAITING_APPROVAL' && activeMission) {
+      interval = setInterval(async () => {
+        try {
+          const response = await fetch(`http://127.0.0.1:8000/api/mission/status/${activeMission.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setApprovals({ pilot: data.pilot_approved, manager: data.manager_approved });
+            // Se entrambi i semafori sono verdi, sblocca il lancio
+            if (data.pilot_approved && data.manager_approved) {
+              setMissionPhase('READY');
+              clearInterval(interval);
+            }
+          }
+        } catch (err) { console.error("Errore polling:", err); }
+      }, 1000);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [missionPhase, activeMission]);
+  // --- FINE LOGICA TELEGRAM WORKFLOW ---
+
   useEffect(() => {
     // 1. Definiamo la funzione asincrona internamente
     const fetchMissions = async () => {
@@ -224,7 +278,7 @@ const handleLoginSuccess = (jwtToken, role) => {
         <div className="h-[55%] bg-neutral-800 border border-neutral-700 rounded-lg p-4 flex flex-col gap-2 overflow-y-auto">
           <div className="flex justify-between items-center border-b border-neutral-600 pb-2 mb-2">
              <h2 className="text-yellow-400 font-bold">Missioni dal Database</h2>
-             <button onClick={() => setActiveMission(null)} className="text-xs bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded transition">Pulisci Mappa</button>
+             <button onClick={() => { setActiveMission(null); setMissionPhase('IDLE'); }} className="text-xs bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded transition">Pulisci Mappa</button>
           </div>
           
           {serverMissions.length === 0 ? (
@@ -241,6 +295,7 @@ const handleLoginSuccess = (jwtToken, role) => {
                     waypoints: mission.waypoints,
                     details: mission.details 
                   });
+                  setMissionPhase('IDLE'); // Resetta lo stato di approvazione quando selezioni una nuova missione
                 }}
                 className={`p-3 rounded-lg text-sm cursor-pointer transition-all border ${activeMission?.id === mission.mission_id ? 'bg-blue-800/80 border-blue-400 shadow-lg' : 'bg-neutral-900/40 border-neutral-700 hover:border-neutral-500 hover:bg-neutral-700/50'}`}
               >
@@ -250,16 +305,59 @@ const handleLoginSuccess = (jwtToken, role) => {
                 </div>
                 <div className="text-xs text-neutral-400 mt-2">Piattaforma: <span className="text-white font-mono bg-neutral-800 px-1 rounded">{mission.drone}</span></div>
                 
-                {activeMission?.id === mission.mission_id && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowDetailsModal(true);
-                    }}
-                    className="mt-3 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 rounded text-xs transition shadow flex items-center justify-center gap-1"
-                  >
-                    📄 Apri Scheda Tecnica
-                  </button>
+               {activeMission?.id === mission.mission_id && (
+                  <div className="mt-3 flex flex-col gap-2 border-t border-neutral-600 pt-3">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDetailsModal(true);
+                      }}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 rounded text-xs transition shadow flex items-center justify-center gap-1"
+                    >
+                      📄 Apri Scheda Tecnica
+                    </button>
+
+                    {/* --- WORKFLOW AUTORIZZAZIONI --- */}
+                    {missionPhase === 'IDLE' && (
+                      <button
+                        onClick={handleRequestDispatch}
+                        className="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 rounded text-xs transition shadow uppercase tracking-wider mt-1"
+                      >
+                        1. Richiedi Clearance
+                      </button>
+                    )}
+
+                    {missionPhase === 'AWAITING_APPROVAL' && (
+                      <div className="bg-black/60 p-2 rounded border border-neutral-600 text-xs mt-1">
+                        <div className="text-neutral-400 mb-2 tracking-widest uppercase text-[10px]">Stato Autorizzazioni:</div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span>Pilota (Telegram):</span>
+                          <span className={approvals.pilot ? "text-green-500 font-bold" : "text-yellow-500 animate-pulse"}>
+                            {approvals.pilot ? "✔ OK" : "ATTESA..."}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span>Resp. Sala:</span>
+                          {userRole === 'responsabile' && !approvals.manager ? (
+                            <button onClick={handleManagerApprove} className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded text-[10px]">Approva</button>
+                          ) : (
+                            <span className={approvals.manager ? "text-green-500 font-bold" : "text-yellow-500 animate-pulse"}>
+                              {approvals.manager ? "✔ OK" : "ATTESA..."}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {missionPhase === 'READY' && (
+                      <button
+                        onClick={handleUploadAndLaunch}
+                        className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded text-xs transition shadow uppercase tracking-wider animate-pulse mt-1"
+                      >
+                        🚀 UPLOAD TO DRONE & ARM
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ))
