@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 // 1. IMPORTIAMO LE EMERGENZE LOCALMENTE (Il Database non c'entra, sicurezza al 100%)
 import emergenzaData from './data/ugcs/emergenza.json';
 import Login from './Login';
+import WeatherScreen from './WeatherScreen';
 //import RTH from './data/ugcs/rth.json';
 
 function extractUgcsWaypoints(ugcsJson) {
@@ -47,6 +48,23 @@ const emergencyProtocols = [
 ];
 
 export default function App() {
+
+ // 🔒 CONTROLLO MULTI-SCHERMO PROTETTO
+  if (window.location.pathname === '/meteo' || window.location.hash === '#/meteo') {
+    const savedToken = localStorage.getItem('control_room_token');
+    
+    // Se non c'è il token nel localStorage, l'accesso viene negato istantaneamente
+    if (!savedToken) {
+      return (
+        <div className="h-screen w-screen bg-black text-red-500 flex flex-col items-center justify-center font-mono p-4 border-4 border-red-900">
+          <div className="text-3xl font-black tracking-widest animate-pulse">⚠️ SECURITY VIOLATION</div>
+          <div className="text-sm text-neutral-500 mt-2 uppercase tracking-wider">Accesso negato. Inizializzare la connessione dalla Control Room principale.</div>
+        </div>
+      );
+    }
+    return <WeatherScreen />;
+  }
+
   const [activeMission, setActiveMission] = useState(null);
   const [serverMissions, setServerMissions] = useState([]);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -54,13 +72,20 @@ export default function App() {
   const mapCenter = [44.437475, 8.880381];
   const [token, setToken] = useState(null);
   const [userRole, setUserRole] = useState(null);
-  const handleLoginSuccess = (jwtToken, role) => {
+const handleLoginSuccess = (jwtToken, role) => {
     setToken(jwtToken);
     setUserRole(role);
+    // Salva le credenziali nel browser per gli altri schermi
+    localStorage.setItem('control_room_token', jwtToken);
+    localStorage.setItem('control_room_role', role);
   };
+
   const handleLogout = () => {
     setToken(null);
     setUserRole(null);
+    // Pulisce il browser alla disconnessione
+    localStorage.removeItem('control_room_token');
+    localStorage.removeItem('control_room_role');
   };
 
   useEffect(() => {
