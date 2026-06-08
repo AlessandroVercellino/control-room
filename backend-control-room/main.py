@@ -1,25 +1,17 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import os
+import shutil
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from passlib.context import CryptContext
-import jwt
-import sqlite3
-import json
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
+from fastapi import HTTPException, status
+import jwt
 
-# Per le chiamate HTTP verso il frontend (es. notifiche)
-import requests
-import asyncio
-
-# --- CONFIGURAZIONI DI SICUREZZA ---
-SECRET_KEY = "chiave-segreta-control-room-iplom"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 120
-DB_PATH = "control_room.db" # Usiamo il TUO database esistente!
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+# Importiamo le tabelle dal tuo database
+from database import SessionLocal, Drone, Mission, User, FlightPlan
 
 app = FastAPI()
 
@@ -31,237 +23,201 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODELLI DATI ---
-class UserRegister(BaseModel):
-    username: str
-    password: str
-    role: str
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+# ==========================================
+# 🔐 GESTIONE SICUREZZA (JWT & Password)
+# ==========================================
+SECRET_KEY = "la_tua_chiave_segreta_super_sicura_cambiala_in_produzione"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440 # Il token dura 24 ore
 
-# --- INIZIALIZZAZIONE TABELLA AUTENTICAZIONE ---
-def init_db():
-    # Creiamo la tabella auth_users per non toccare la tua tabella Users (piloti)
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS auth_users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
-            )
-        """)
-        conn.commit()
-
-init_db()
-
-# --- FUNZIONI DI SICUREZZA (JWT e Hashing) ---
-def get_password_hash(password: str):
-    return pwd_context.hash(password)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        role: str = payload.get("role")
-        if username is None or role is None:
-            raise HTTPException(status_code=401, detail="Token non valido")
-        return {"username": username, "role": role}
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Token scaduto")
-
-# --- ENDPOINT DI BASE E LOGIN ---
-@app.get("/")
-def read_root():
-    return {"status": "online", "message": "Control Room Backend Operational"}
-
-@app.post("/api/auth/register")
-async def register_user(user_data: UserRegister):
-    if user_data.role not in ["responsabile", "operatore", "spettatore"]:
-        raise HTTPException(status_code=400, detail="Ruolo non valido")
-    
-    hashed_password = get_password_hash(user_data.password)
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO auth_users (username, password_hash, role) VALUES (?, ?, ?)",
-                (user_data.username, hashed_password, user_data.role)
-            )
-            conn.commit()
-        return {"status": "success", "message": f"Utente {user_data.username} creato!"}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Username già esistente")
-
+# ---- ROTTA DI LOGIN (Quella che React stava cercando!) ----
 @app.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM auth_users WHERE username = ?", (form_data.username,))
-        user = cursor.fetchone()
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Cerca l'utente usando il badge_code come 'username'
+    user = db.query(User).filter(User.badge_code == form_data.username).first()
     
-    if not user or not verify_password(form_data.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Credenziali errate")
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Badge o password non validi",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    access_token = create_access_token(data={"sub": user["username"], "role": user["role"]})
-    return {"access_token": access_token, "token_type": "bearer", "role": user["role"]}
-
-
-# --- I TUOI ENDPOINT DEL DRONE (Protetti) ---
-
-# Ora get_missions è protetto: solo chi ha fatto il login può vedere i piani di volo!
-@app.get("/api/missions")
-def get_missions(current_user: dict = Depends(get_current_user)):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    # Se la password è giusta, crea il token
+    access_token = create_access_token(data={"sub": user.badge_code, "role": user.role})
     
-    cursor.execute('''
-    SELECT Missions.id, Users.full_name, Drones.name, Flight_Plans.route_name, Missions.status, Flight_Plans.waypoints, Flight_Plans.details
-    FROM Missions
-    JOIN Users ON Missions.pilot_id = Users.id
-    JOIN Drones ON Missions.drone_id = Drones.id
-    JOIN Flight_Plans ON Missions.flight_plan_id = Flight_Plans.id
-    ''')
-    
-    raw_missions = cursor.fetchall()
-    conn.close()
-
-    mission_list = []
-    for m in raw_missions:
-        waypoints_array = json.loads(m[5]) if m[5] else []
-        details_obj = json.loads(m[6]) if m[6] else {}
-        
-        mission_list.append({
-            "mission_id": m[0],
-            "pilot": m[1],
-            "drone": m[2],
-            "route": m[3],
-            "status": m[4],
-            "waypoints": waypoints_array,
-            "details": details_obj
-        })
-        
-    return mission_list
-
-# Esempio di endpoint protetto solo per Responsabili e Operatori
-@app.post("/api/emergency/rth")
-async def trigger_rth(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] == "spettatore":
-        raise HTTPException(status_code=403, detail="Azione negata. Spettatore non autorizzato.")
-    return {"status": "success", "message": f"RTH avviato da {current_user['username']}"}
-
-# --- CONFIGURAZIONE TELEGRAM ---
-TELEGRAM_BOT_TOKEN = "8817765386:AAHUHLAMj88jj6OhEhPjWjChM8gJ1zJr8Ts"
-TELEGRAM_PILOT_CHAT_ID = "966691579"
-
-# 1. Database temporaneo dinamico (ora è vuoto, si riempie da solo)
-db_missioni = {}
-
-# Accettiamo sia ID testuali che numerici usando la flessibilità di Pydantic
-class MissionClearanceRequest(BaseModel):
-    mission_id: str | int  
+    return {"access_token": access_token, "token_type": "bearer", "role": user.role}
+# ==========================================
+# MODELLI PYDANTIC (Per validare i dati da React)
+# ==========================================
+class ClearanceRequest(BaseModel):
+    mission_id: str | int
     mission_name: str
 
-@app.post("/api/mission/request-clearance")
-def request_flight_clearance(mission: MissionClearanceRequest):
-    # Convertiamo l'ID in stringa per sicurezza
-    m_id = str(mission.mission_id)
-    
-    # Creiamo lo stato della missione "al volo" se non esiste
-    db_missioni[m_id] = {
-        "pilot_approved": False, 
-        "manager_approved": False, 
-        "status": "AWAITING_APPROVAL"
-    }
+class UserCreate(BaseModel):
+    full_name: str
+    badge_code: str
+    role: str
 
-    messaggio = (
-        f"🚨 *RICHIESTA CLEARANCE DI VOLO* 🚨\n\n"
-        f"📍 *Missione:* {mission.mission_name}\n"
-        f"🏷 *ID:* `{m_id}`\n\n"
-        f"Il Controllo richiede l'autorizzazione.\n"
-        f"Pilota, confermi area di volo sgombra?"
+class DroneCreate(BaseModel):
+    name: str
+    hardware_serial: str
+    payload_sensors: str = "Not defined" # Valore di default
+
+telegram_status_mock = {}
+
+# ==========================================
+# 1. NUOVE ROTTE PER L'ADMIN PANEL (Inserimento Dati)
+# ==========================================
+
+@app.get("/api/users")
+def get_users(db: Session = Depends(get_db)):
+    """Restituisce tutti gli utenti (utile per i menu a tendina in React)"""
+    return db.query(User).all()
+
+@app.get("/api/drones")
+def get_drones(db: Session = Depends(get_db)):
+    """Restituisce tutti i droni"""
+    return db.query(Drone).all()
+
+@app.post("/api/users")
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """Crea un nuovo operatore/pilota/responsabile"""
+    db_user = User(full_name=user.full_name, badge_code=user.badge_code, role=user.role.lower())
+    db.add(db_user)
+    db.commit()
+    return {"message": f"Utente {user.full_name} creato con successo!"}
+
+@app.post("/api/drones")
+def create_drone(drone: DroneCreate, db: Session = Depends(get_db)):
+    """Aggiunge un drone alla flotta con il suo payload"""
+    db_drone = Drone(
+        name=drone.name, 
+        hardware_serial=drone.hardware_serial,
+        payload_sensors=drone.payload_sensors
     )
+    db.add(db_drone)
+    db.commit()
+    return {"message": f"Drone {drone.name} registrato con payload: {drone.payload_sensors}"}
 
-    bottoni = {
-        "inline_keyboard": [[
-            {"text": "✅ AUTORIZZA", "callback_data": f"AUTH_OK_{m_id}"},
-            {"text": "❌ NEGA", "callback_data": f"AUTH_NO_{m_id}"}
-        ]]
-    }
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_PILOT_CHAT_ID, "text": messaggio, "parse_mode": "Markdown", "reply_markup": bottoni}
+@app.post("/api/missions/upload")
+async def upload_mission(
+    route_name: str = Form(...),
+    drone_id: int = Form(...),
+    pilot_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Riceve il file JSON (Drag&Drop) e crea la missione nel DB"""
+    # 1. Crea una cartella fisica sul tuo PC per salvare i file di UgCS se non esiste
+    upload_dir = "uploaded_missions"
+    os.makedirs(upload_dir, exist_ok=True)
     
-    # Stampiamo nel terminale per debug
-    print(f"➔ Inviando richiesta a Telegram per missione {m_id}...")
-    requests.post(url, json=payload)
+    # 2. Salva il file
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # 3. Crea il Piano di Volo nel DB
+    new_plan = FlightPlan(
+        route_name=route_name,
+        file_path=file_path,
+        details="Caricata tramite Admin Panel"
+    )
+    db.add(new_plan)
+    db.commit()
+    db.refresh(new_plan) # Serve per farsi dare l'ID appena creato da PostgreSQL
     
-    return {"status": "success", "detail": "Richiesta inoltrata al pilota"}
+    # 4. Crea la Missione collegando Piano, Drone e Pilota
+    new_mission = Mission(
+        flight_plan_id=new_plan.id,
+        drone_id=drone_id,
+        pilot_id=pilot_id,
+        status="PLANNED"
+    )
+    db.add(new_mission)
+    db.commit()
+    
+    return {"message": f"Missione '{route_name}' pronta per il volo!"}
 
-@app.get("/api/mission/status/{mission_id}")
-def get_mission_status(mission_id: str):
-    # Se la missione non è ancora nel dizionario, ritorniamo un default invece di un Errore 404
-    if mission_id not in db_missioni:
-        return {"pilot_approved": False, "manager_approved": False, "status": "IDLE"}
-    return db_missioni[mission_id]
+
+# ==========================================
+# 2. ROTTE ESISTENTI (Lettura e Telegram Workflow)
+# ==========================================
+
+@app.get("/api/missions")
+def get_missions(db: Session = Depends(get_db)):
+    missions = db.query(Mission).all()
+    result = []
+    for m in missions:
+        result.append({
+            "mission_id": m.id,
+            "route": m.plan.route_name if m.plan else "Sconosciuta",
+            "status": m.status,
+            "drone": m.drone.name if m.drone else "N/A",
+            "waypoints": [], 
+            "details": {
+                "max_altitude_m": 120,
+                "total_waypoints": 0,
+                "flight_type": "Database Route",
+                "source_software": "UgCS"
+            }
+        })
+    return result
+
+@app.post("/api/mission/request-clearance")
+def request_clearance(req: ClearanceRequest):
+    telegram_status_mock[str(req.mission_id)] = {"pilot_approved": False, "manager_approved": False}
+    import threading
+    import time
+    def simulate_telegram_click():
+        time.sleep(4)
+        telegram_status_mock[str(req.mission_id)]["pilot_approved"] = True
+    threading.Thread(target=simulate_telegram_click).start()
+    return {"status": "Notifica inviata"}
 
 @app.post("/api/mission/approve-manager/{mission_id}")
 def approve_manager(mission_id: str):
-    if mission_id in db_missioni:
-        db_missioni[mission_id]["manager_approved"] = True
-        return {"status": "success"}
-    # Se per caso il manager clicca troppo presto
-    db_missioni[mission_id] = {"pilot_approved": False, "manager_approved": True, "status": "AWAITING"}
-    return {"status": "success"}
+    if mission_id not in telegram_status_mock:
+        telegram_status_mock[mission_id] = {"pilot_approved": False, "manager_approved": False}
+    telegram_status_mock[mission_id]["manager_approved"] = True
+    return {"status": "Manager approvato"}
 
+@app.get("/api/mission/status/{mission_id}")
+def get_mission_status(mission_id: str):
+    return telegram_status_mock.get(mission_id, {"pilot_approved": False, "manager_approved": False})
 
-# 2. MOTORE BACKGROUND: Ascolta i click sul tuo telefono senza bisogno di Webhook pubblici
-async def ascolta_telegram():
-    offset = 0
-    print("🚀 Bot Telegram in ascolto per le clearance dei droni...")
-    while True:
-        try:
-            # Chiediamo a Telegram se ci sono nuovi click sui bottoni
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?offset={offset}&timeout=1"
-            res = requests.get(url).json()
-            
-            if "result" in res:
-                for update in res["result"]:
-                    offset = update["update_id"] + 1
-                    
-                    # Se l'utente ha cliccato un bottone inline sul telefono
-                    if "callback_query" in update:
-                        callback = update["callback_query"]
-                        data_ricevuta = callback["data"] # Es: "AUTH_OK_IPL-001"
-                        
-                        if data_ricevuta.startswith("AUTH_OK_"):
-                            m_id = data_ricevuta.replace("AUTH_OK_", "")
-                            if m_id in db_missioni:
-                                db_missioni[m_id]["pilot_approved"] = True
-                                print(f"➔ [TELEGRAM] Il pilota ha approvato la missione: {m_id}")
-                                
-                        elif data_ricevuta.startswith("AUTH_NO_"):
-                            m_id = data_ricevuta.replace("AUTH_NO_", "")
-                            if m_id in db_missioni:
-                                db_missioni[m_id]["status"] = "REJECTED"
-                                print(f"➔ [TELEGRAM] Il pilota ha RIFIUTATO la missione: {m_id}")
-                                
-                        # Notifica a Telegram che abbiamo ricevuto il click (toglie il caricamento sul telefono)
-                        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": callback["id"]})
-        except Exception as e:
-            pass
-        await asyncio.sleep(1) # Controlla i bottoni ogni secondo
-
-# Avvia il ciclo di Telegram insieme a FastAPI
-@app.on_event("startup")
-def start_bot_loop():
-    asyncio.create_task(ascolta_telegram())
+# ==========================================
+# WEBSOCKET
+# ==========================================
+@app.websocket("/ws/telemetry")
+async def websocket_telemetry(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await websocket.send_text(data)
+    except WebSocketDisconnect:
+        pass
