@@ -177,6 +177,11 @@ const handleLoginSuccess = (jwtToken, role) => {
   return (
     <div className="h-screen w-screen bg-neutral-900 text-white flex p-2 gap-2 font-sans overflow-hidden relative">
       
+      {/* IL PANNELLO ADMIN (Si sovrappone a tutto se lo stato è true) */}
+      {showAdminPanel && (
+        <AdminPanel token={token} onClose={() => setShowAdminPanel(false)} />
+      )}
+
       {/* POP-UP MODAL */}
       {showDetailsModal && activeMission && (
         <MissionModal 
@@ -197,27 +202,10 @@ const handleLoginSuccess = (jwtToken, role) => {
         mapCenter={mapCenter} 
       />
 
-      {/* HEADER UTENTE */}
-<div className="bg-neutral-800 border border-neutral-700 rounded-lg p-3 flex justify-between items-center">
-  <span className="text-sm">
-    Ruolo: <span className="text-blue-400 uppercase font-bold">{userRole}</span>
-  </span>
-  <div className="flex gap-2">
-    {/* IL NUOVO BOTTONE */}
-    {userRole === 'responsabile' && (
-      <button onClick={() => setShowAdminPanel(true)} className="bg-yellow-600/80 hover:bg-yellow-600 text-xs px-2 py-1 rounded transition border border-yellow-700">
-        ⚙️ Admin
-      </button>
-    )}
-    <button onClick={handleLogout} className="bg-red-900/80 hover:bg-red-800 text-xs px-2 py-1 rounded transition border border-red-700">
-      Disconnetti
-    </button>
-  </div>
-</div>
-
       {/* SEZIONE DESTRA (Sidebar) */}
     <Sidebar 
         userRole={userRole}
+        onOpenAdmin={() => setShowAdminPanel(true)}
         handleLogout={handleLogout}
         serverMissions={serverMissions}
         activeMission={activeMission}

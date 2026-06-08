@@ -5,6 +5,7 @@ export default function Sidebar({
   userRole,
   handleLogout,
   serverMissions,
+  onOpenAdmin,
   activeMission,
   setActiveMission,
   setMissionPhase,
@@ -13,14 +14,22 @@ export default function Sidebar({
 }) {
   return (
     <div className="w-96 flex flex-col gap-2">
-      {/* HEADER UTENTE */}
+     {/* HEADER UTENTE */}
       <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-3 flex justify-between items-center">
         <span className="text-sm">
           Ruolo: <span className="text-blue-400 uppercase font-bold">{userRole}</span>
         </span>
-        <button onClick={handleLogout} className="bg-red-900/80 hover:bg-red-800 text-xs px-2 py-1 rounded transition border border-red-700">
-          Disconnetti
-        </button>
+        <div className="flex gap-2">
+          {/* IL BOTTONE ADMIN COLLEGATO ALLA PROP */}
+          {userRole === 'responsabile' && (
+            <button onClick={onOpenAdmin} className="bg-yellow-600/80 hover:bg-yellow-600 text-xs px-2 py-1 rounded transition border border-yellow-700">
+              ⚙️ Admin
+            </button>
+          )}
+          <button onClick={handleLogout} className="bg-red-900/80 hover:bg-red-800 text-xs px-2 py-1 rounded transition border border-red-700">
+            Disconnetti
+          </button>
+        </div>
       </div>
       
       {/* LISTA MISSIONI */}
