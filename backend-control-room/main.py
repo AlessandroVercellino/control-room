@@ -15,7 +15,7 @@ import requests
 import threading
 import time
 # Importiamo le tabelle dal tuo database
-from database import SessionLocal, Drone, Mission, User, FlightPlan
+from database import SessionLocal, Drone, Mission, User, FlightPlan, SystemLog
 
 app = FastAPI()
 
@@ -63,14 +63,32 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = db.query(User).filter(User.badge_code == form_data.username).first()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
+
+       # 🚨 FAIL LOG: Someone is trying to force access
+        failed_log = SystemLog(
+            action_type="SECURITY_ALERT",
+            description=f"FAILED login attempt for Operator ID: {form_data.username}"
+        )
+        db.add(failed_log)
+        db.commit()
+        
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Badge o password non validi",
+            detail="Invalid badge code or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Se la password è giusta, crea il token
     access_token = create_access_token(data={"sub": user.badge_code, "role": user.role})
+
+   # ✅ SUCCESS LOG: Tracking room entry
+    new_log = SystemLog(
+        user_id=user.id, 
+        action_type="USER_LOGIN", 
+        description=f"Operator {user.full_name} logged in with role: {user.role.upper()}"
+    )
+    db.add(new_log)
+    db.commit()
     
     return {"access_token": access_token, "token_type": "bearer", "role": user.role}
 # ==========================================
@@ -84,6 +102,7 @@ class UserCreate(BaseModel):
     full_name: str
     badge_code: str
     role: str
+    password: str
 
 class DroneCreate(BaseModel):
     name: str
@@ -98,33 +117,44 @@ telegram_status_mock = {}
 
 @app.get("/api/users")
 def get_users(db: Session = Depends(get_db)):
-    """Restituisce tutti gli utenti (utile per i menu a tendina in React)"""
+    """Restituisce tutti gli utenti per i menu a tendina in React"""
     return db.query(User).all()
 
 @app.get("/api/drones")
 def get_drones(db: Session = Depends(get_db)):
-    """Restituisce tutti i droni"""
+    """Restituisce tutti i droni per i menu a tendina in React"""
     return db.query(Drone).all()
 
 @app.post("/api/users")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    """Crea un nuovo operatore/pilota/responsabile"""
-    db_user = User(full_name=user.full_name, badge_code=user.badge_code, role=user.role.lower())
+    hashed_pwd = get_password_hash(user.password)
+    db_user = User(full_name=user.full_name, badge_code=user.badge_code, role=user.role.lower(), hashed_password=hashed_pwd)
     db.add(db_user)
     db.commit()
-    return {"message": f"Utente {user.full_name} creato con successo!"}
+    db.refresh(db_user)
+
+    # 📝 LOG: Control Room staff modification
+    db.add(SystemLog(
+        action_type="USER_CREATED",
+        description=f"New user registered in the system: {user.full_name} with role {user.role}"
+    ))
+    db.commit()
+    return {"message": f"User {user.full_name} created successfully!"}
 
 @app.post("/api/drones")
 def create_drone(drone: DroneCreate, db: Session = Depends(get_db)):
-    """Aggiunge un drone alla flotta con il suo payload"""
-    db_drone = Drone(
-        name=drone.name, 
-        hardware_serial=drone.hardware_serial,
-        payload_sensors=drone.payload_sensors
-    )
+    db_drone = Drone(name=drone.name, hardware_serial=drone.hardware_serial, payload_sensors=drone.payload_sensors)
     db.add(db_drone)
     db.commit()
-    return {"message": f"Drone {drone.name} registrato con payload: {drone.payload_sensors}"}
+    db.refresh(db_drone)
+
+    # 📝 LOG: Hardware fleet modification
+    db.add(SystemLog(
+        action_type="DRONE_REGISTERED",
+        description=f"New vehicle added to the fleet: {drone.name} | Payload: {drone.payload_sensors}"
+    ))
+    db.commit()
+    return {"message": f"Drone {drone.name} registered successfully!"}
 
 @app.post("/api/missions/upload")
 async def upload_mission(
@@ -134,37 +164,32 @@ async def upload_mission(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    """Riceve il file JSON (Drag&Drop) e crea la missione nel DB"""
-    # 1. Crea una cartella fisica sul tuo PC per salvare i file di UgCS se non esiste
     upload_dir = "uploaded_missions"
     os.makedirs(upload_dir, exist_ok=True)
     
-    # 2. Salva il file
     file_path = os.path.join(upload_dir, file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # 3. Crea il Piano di Volo nel DB
-    new_plan = FlightPlan(
-        route_name=route_name,
-        file_path=file_path,
-        details="Caricata tramite Admin Panel"
-    )
+    new_plan = FlightPlan(route_name=route_name, file_path=file_path, details="Uploaded via Admin Panel")
     db.add(new_plan)
     db.commit()
-    db.refresh(new_plan) # Serve per farsi dare l'ID appena creato da PostgreSQL
+    db.refresh(new_plan)
     
-    # 4. Crea la Missione collegando Piano, Drone e Pilota
-    new_mission = Mission(
-        flight_plan_id=new_plan.id,
-        drone_id=drone_id,
-        pilot_id=pilot_id,
-        status="PLANNED"
-    )
+    new_mission = Mission(flight_plan_id=new_plan.id, drone_id=drone_id, pilot_id=pilot_id, status="PLANNED")
     db.add(new_mission)
     db.commit()
+    db.refresh(new_mission)
     
-    return {"message": f"Missione '{route_name}' pronta per il volo!"}
+    # 📝 LOG: New flight plan registered
+    db.add(SystemLog(
+        user_id=pilot_id,
+        action_type="MISSION_UPLOADED",
+        description=f"UgCS flight plan '{route_name}' uploaded (Mission ID: {new_mission.id}). Assigned to drone ID {drone_id}"
+    ))
+    db.commit()
+    
+    return {"message": f"Mission '{route_name}' ready for flight!"}
 
 
 # ==========================================
@@ -230,7 +255,7 @@ telegram_status_mock = {}
 LAST_UPDATE_ID = 0  # Serve al server per non rileggere lo stesso click due volte
 
 # ==========================================
-# 🎧 IL "MOTORE IN SOTTOFONDO" CHE ASCOLTA TELEGRAM
+# 🎧 TELEGRAM POLLING (With Pilot Decision Logs)
 # ==========================================
 def telegram_polling():
     global LAST_UPDATE_ID
@@ -238,46 +263,59 @@ def telegram_polling():
     
     while True:
         try:
-            # Chiediamo a Telegram: "Qualcuno ha premuto un bottone?"
             response = requests.get(url, params={"offset": LAST_UPDATE_ID, "timeout": 5}, timeout=10).json()
-            
             if response.get("ok"):
                 for result in response.get("result", []):
                     LAST_UPDATE_ID = result["update_id"] + 1
 
-                    # Se c'è un click su un bottone (Callback Query)
                     if "callback_query" in result:
                         callback = result["callback_query"]
-                        data = callback["data"]  # Conterrà "approve_1" o "reject_1"
+                        data = callback["data"]
                         callback_id = callback["id"]
                         chat_id = callback["message"]["chat"]["id"]
                         message_id = callback["message"]["message_id"]
+                        
+                        # Isolate DB session for the background thread
+                        db = SessionLocal()
 
                         if data.startswith("approve_"):
                             mid = data.split("_")[1]
-                            # Accende il semaforo verde per React!
                             if mid in telegram_status_mock:
                                 telegram_status_mock[mid]["pilot_approved"] = True
+                            
+                            # 🚨 TRUE LOG: EXTERNAL APPROVAL
+                            db.add(SystemLog(
+                                action_type="TELEGRAM_PILOT_APPROVE",
+                                description=f"Field pilot granted clearance via Telegram for mission ID: {mid}"
+                            ))
+                            db.commit()
 
-                            # 1. Dice a Telegram "Ricevuto!" così il bottone smette di caricare
                             requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", params={"callback_query_id": callback_id})
-                            # 2. Modifica il messaggio cancellando i bottoni
                             requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
                                 "chat_id": chat_id, "message_id": message_id,
-                                "text": f"✅ *Missione {mid} APPROVATA* dal Pilota. Armamento in corso...", "parse_mode": "Markdown"
+                                "text": f"✅ *Mission {mid} APPROVED* by Pilot. Control Room unlocked.", "parse_mode": "Markdown"
                             })
 
                         elif data.startswith("reject_"):
                             mid = data.split("_")[1]
+                            
+                            # 🚨 TRUE LOG: REJECTION (Critical for post-flight analysis)
+                            db.add(SystemLog(
+                                action_type="TELEGRAM_PILOT_REJECT",
+                                description=f"WARNING: Field pilot REJECTED clearance for mission ID: {mid}"
+                            ))
+                            db.commit()
+
                             requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", params={"callback_query_id": callback_id})
                             requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
                                 "chat_id": chat_id, "message_id": message_id,
-                                "text": f"❌ *Missione {mid} RIFIUTATA* dal Pilota. Volo annullato.", "parse_mode": "Markdown"
+                                "text": f"❌ *Mission {mid} REJECTED* by Pilot. Operation aborted.", "parse_mode": "Markdown"
                             })
+                        
+                        db.close() # Close thread session
         except Exception as e:
-            pass # Ignora gli errori di connessione e riprova
-        
-        time.sleep(1) # Pausa di 1 secondo prima di richiederlo
+            print(f"Telegram polling error: {e}")
+        time.sleep(1)
 
 # Accendiamo il motore di ascolto appena FastAPI parte!
 @app.on_event("startup")
@@ -286,45 +324,49 @@ def startup_event():
     threading.Thread(target=telegram_polling, daemon=True).start()
 
 # ==========================================
-# 🚀 LE ROTTE UFFICIALI PER REACT
+# 🚀 WORKFLOW ROUTES (With Operational Logs)
 # ==========================================
+
 @app.post("/api/mission/request-clearance")
-def request_clearance(req: ClearanceRequest):
+def request_clearance(req: ClearanceRequest, db: Session = Depends(get_db)):
     mid = str(req.mission_id)
     telegram_status_mock[mid] = {"pilot_approved": False, "manager_approved": False}
     
-    messaggio = (
-        f"🚨 *RICHIESTA CLEARANCE VOLO*\n"
-        f"Missione: {req.mission_name}\n"
-        f"Piattaforma in attesa di sblocco."
-    )
-    
-    # LA MAGIA: I bottoni nativi di Telegram!
-    reply_markup = {
-        "inline_keyboard": [
-            [
-                {"text": "✅ APPROVA", "callback_data": f"approve_{mid}"},
-                {"text": "❌ RIFIUTA", "callback_data": f"reject_{mid}"}
-            ]
-        ]
-    }
+    # 📝 LOG: Start of the authorization chain
+    db.add(SystemLog(
+        action_type="CLEARANCE_REQUESTED",
+        description=f"Clearance procedure initiated for mission '{req.mission_name}' (ID: {mid}). Notification sent to pilot."
+    ))
+    db.commit()
+
+    messaggio = f"🚨 *FLIGHT CLEARANCE REQUEST*\nMission: {req.mission_name}\nPlatform awaiting unlock."
+    reply_markup = {"inline_keyboard": [[
+        {"text": "✅ APPROVE", "callback_data": f"approve_{mid}"},
+        {"text": "❌ REJECT", "callback_data": f"reject_{mid}"}
+    ]]}
     
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": messaggio, "parse_mode": "Markdown", "reply_markup": reply_markup}
-        requests.post(url, json=payload)
+        requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": messaggio, "parse_mode": "Markdown", "reply_markup": reply_markup})
     except Exception as e:
-        print(f"Errore invio Telegram: {e}")
+        print(f"Telegram sending error: {e}")
 
-    return {"status": "Notifica inviata"}
+    return {"status": "Notification sent successfully"}
 
 @app.post("/api/mission/approve-manager/{mission_id}")
-def approve_manager(mission_id: str):
+def approve_manager(mission_id: str, db: Session = Depends(get_db)):
     mid = str(mission_id)
     if mid not in telegram_status_mock:
         telegram_status_mock[mid] = {"pilot_approved": False, "manager_approved": False}
     telegram_status_mock[mid]["manager_approved"] = True
-    return {"status": "Manager approvato"}
+    
+    # 📝 LOG: Room Manager Digital Signature
+    db.add(SystemLog(
+        action_type="MANAGER_ROOM_APPROVE",
+        description=f"Control Room Manager digitally signed approval for mission ID: {mid}"
+    ))
+    db.commit()
+    return {"status": "Manager approval recorded"}
 
 @app.get("/api/mission/status/{mission_id}")
 def get_mission_status(mission_id: str):

@@ -68,3 +68,17 @@ class TelemetryLog(Base):
     heading = Column(Float) # Direzione del muso del drone
     speed = Column(Float)
     sensor_data = Column(JSON, nullable=True)
+
+    # ==========================================
+# 3. AUDIT TRAIL (REGISTRO DI SISTEMA)
+# ==========================================
+
+class SystemLog(Base):
+    __tablename__ = "system_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # Chi ha fatto l'azione (opzionale)
+    action_type = Column(String, nullable=False) # Es: LOGIN, MISSION_UPLOADED, ecc.
+    description = Column(String, nullable=False) # Dettaglio testuale dell'evento
+
+    user = relationship("User")
