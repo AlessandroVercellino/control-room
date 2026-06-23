@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, create_engine, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, create_engine, JSON, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime
 from geoalchemy2 import Geometry # Il modulo per usare PostGIS!
@@ -17,6 +17,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
     badge_code = Column(String, unique=True, nullable=False, index=True)
+    codice_fiscale = Column(String, unique=True, nullable=False)
     role = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
 
@@ -51,6 +52,14 @@ class Mission(Base):
     plan = relationship("FlightPlan")
     drone = relationship("Drone")
     pilot = relationship("User")
+
+class NoFlyZone(Base):
+    __tablename__ = "no_fly_zones"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    geometry = Column(Geometry(geometry_type='POLYGON', srid=4326)) # <--- NUOVO
+    active = Column(Boolean, default=True)
+    description = Column(String, nullable=True)
 
 # --- DATI VELOCI (TIME-SERIES) ---
 # Questa è la tabella "Infinita" per la telemetria dell'RTK

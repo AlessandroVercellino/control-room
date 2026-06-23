@@ -8,12 +8,15 @@ def seed_database():
         admin = User(
             full_name="Alessandro", 
             badge_code="admin123",
+            codice_fiscale="VRCALE99M01H501X", # <--- ECCO IL NUOVO CAMPO OBBLIGATORIO
             role="responsabile",
-            hashed_password=get_password_hash("password123") # <--- Inserisci qui la tua password per il primo login
+            hashed_password=get_password_hash("password123") # <--- Password criptata
         )
         db.add(admin)
         db.commit()
         print("✅ Primo admin creato! Usa 'admin123' e 'password123'")
+    else:
+        print("⚠️ Admin già presente nel database.")
     db.close()
 
 if __name__ == "__main__":

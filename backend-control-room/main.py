@@ -3,6 +3,8 @@ import shutil
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from typing import List
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -15,7 +17,7 @@ import requests
 import threading
 import time
 # Importiamo le tabelle dal tuo database
-from database import SessionLocal, Drone, Mission, User, FlightPlan, SystemLog
+from database import SessionLocal, Drone, Mission, User, FlightPlan, SystemLog , NoFlyZone
 
 app = FastAPI()
 
@@ -101,6 +103,7 @@ class ClearanceRequest(BaseModel):
 class UserCreate(BaseModel):
     full_name: str
     badge_code: str
+    codice_fiscale: str
     role: str
     password: str
 
@@ -108,6 +111,11 @@ class DroneCreate(BaseModel):
     name: str
     hardware_serial: str
     payload_sensors: str = "Not defined" # Valore di default
+
+class NFZCreate(BaseModel): # <--- NUOVO MODELLO PER LE NO-FLY ZONE
+    name: str
+    description: str
+    coordinates: List[List[float]]
 
 telegram_status_mock = {}
 
@@ -128,7 +136,7 @@ def get_drones(db: Session = Depends(get_db)):
 @app.post("/api/users")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     hashed_pwd = get_password_hash(user.password)
-    db_user = User(full_name=user.full_name, badge_code=user.badge_code, role=user.role.lower(), hashed_password=hashed_pwd)
+    db_user = User(full_name=user.full_name, badge_code=user.badge_code, role=user.role.lower(), hashed_password=hashed_pwd, codice_fiscale=user.codice_fiscale)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -136,7 +144,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # 📝 LOG: Control Room staff modification
     db.add(SystemLog(
         action_type="USER_CREATED",
-        description=f"New user registered in the system: {user.full_name} with role {user.role}"
+        description=f"New user registered: {user.full_name} (CF: {user.codice_fiscale}) with role {user.role}"
     ))
     db.commit()
     return {"message": f"User {user.full_name} created successfully!"}
@@ -191,7 +199,155 @@ async def upload_mission(
     
     return {"message": f"Mission '{route_name}' ready for flight!"}
 
+# ==========================================
+# 🛑 ROUTES FOR NO-FLY ZONES (Geo-Fencing)
+# ==========================================
 
+@app.post("/api/nfz/upload")
+async def upload_nfz_file(
+    name: str = Form(...),
+    description: str = Form(""),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Uploads a JSON file from UgCS to create an active No-Fly Zone"""
+    upload_dir = "uploaded_nfz"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Extract coordinates from the JSON file
+    # (Using the same extraction logic for now, we will adapt it if UgCS NFZ format differs)
+    coords = extract_waypoints_from_ugcs(file_path)
+    
+    if len(coords) < 3:
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="Error: The file does not contain a valid polygon (minimum 3 points).")
+
+    # PostGIS requires a polygon to be "closed" (first point must equal the last)
+    if coords[0] != coords[-1]:
+        coords.append(coords[0]) 
+        
+    # Create the spatial string (WKT) inverting Lat and Lon for PostGIS (Lon Lat)
+    polygon_wkt = "POLYGON((" + ", ".join([f"{lon} {lat}" for lat, lon in coords]) + "))"
+    
+    db_nfz = NoFlyZone(
+        name=name,
+        description=description,
+        geometry=func.ST_GeomFromText(polygon_wkt, 4326),
+        active=True
+    )
+    db.add(db_nfz)
+    
+    db.add(SystemLog(
+        action_type="NFZ_UPLOADED",
+        description=f"Supervisor uploaded and activated No-Fly Zone: '{name}' via UgCS file."
+    ))
+    db.commit()
+    
+    return {"message": f"No-Fly Zone '{name}' successfully uploaded and activated!"}
+
+@app.get("/api/nfz")
+def get_nfz(db: Session = Depends(get_db)):
+    """Retrieves all active No-Fly Zones for the React map"""
+    nfzs = db.query(NoFlyZone.id, NoFlyZone.name, func.ST_AsGeoJSON(NoFlyZone.geometry).label('geojson')).filter(NoFlyZone.active == True).all()
+    
+    result = []
+    for nfz in nfzs:
+        geo_data = json.loads(nfz.geojson)
+        coords = [[p[1], p[0]] for p in geo_data['coordinates'][0]] # From Lon,Lat to Lat,Lon
+        result.append({"id": nfz.id, "name": nfz.name, "coordinates": coords})
+    return result
+
+@app.delete("/api/nfz/{nfz_id}")
+def delete_nfz(nfz_id: int, db: Session = Depends(get_db)):
+    """Deactivates an existing No-Fly Zone"""
+    nfz = db.query(NoFlyZone).filter(NoFlyZone.id == nfz_id).first()
+    if nfz:
+        nfz.active = False
+        db.add(SystemLog(
+            action_type="NFZ_REMOVED",
+            description=f"Supervisor deactivated No-Fly Zone: '{nfz.name}'"
+        ))
+        db.commit()
+    return {"message": "No-Fly Zone successfully deactivated."}
+
+
+# ==========================================
+# 🚀 UPLOAD MISSIONE (Con Controllo Radar PostGIS)
+# ==========================================
+@app.post("/api/missions/upload")
+async def upload_mission(
+    route_name: str = Form(...),
+    drone_id: int = Form(...),
+    pilot_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    upload_dir = "uploaded_missions"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # 1. Estrazione punti
+    points = extract_waypoints_from_ugcs(file_path)
+    if len(points) < 2:
+         raise HTTPException(status_code=400, detail="Errore: Il file non contiene waypoint validi.")
+
+    # 2. Creazione linea spaziale
+    linestring_wkt = "LINESTRING(" + ", ".join([f"{lon} {lat}" for lat, lon in points]) + ")"
+    
+    # 3. CONTROLLO GEO-FENCING (ST_Intersects)
+    intersecting_nfz = db.query(NoFlyZone).filter(
+        NoFlyZone.active == True,
+        func.ST_Intersects(NoFlyZone.geometry, func.ST_GeomFromText(linestring_wkt, 4326))
+    ).first()
+    
+    if intersecting_nfz:
+        # LOG di Sicurezza
+        db.add(SystemLog(
+            user_id=pilot_id,
+            action_type="SECURITY_ALERT_NFZ",
+            description=f"BLOCKED: Route '{route_name}' intersects active NFZ '{intersecting_nfz.name}'"
+        ))
+        db.commit()
+        
+        # Elimina il file json pericoloso
+        os.remove(file_path) 
+        
+        raise HTTPException(
+            status_code=403, 
+            detail=f"🚨 PIANO DI VOLO BLOCCATO: La traiettoria entra nella No-Fly Zone '{intersecting_nfz.name}'."
+        )
+
+    # 4. SALVATAGGIO MISSIONE SICURA
+    new_plan = FlightPlan(
+        route_name=route_name, 
+        file_path=file_path, 
+        details="Uploaded via Admin Panel",
+        route_geometry=func.ST_GeomFromText(linestring_wkt, 4326)
+    )
+    db.add(new_plan)
+    db.commit()
+    db.refresh(new_plan)
+    
+    new_mission = Mission(flight_plan_id=new_plan.id, drone_id=drone_id, pilot_id=pilot_id, status="PLANNED")
+    db.add(new_mission)
+    db.commit()
+    db.refresh(new_mission)
+    
+    db.add(SystemLog(
+        user_id=pilot_id,
+        action_type="MISSION_UPLOADED",
+        description=f"Safe flight plan '{route_name}' uploaded (Mission ID: {new_mission.id}). NFZ check: CLEAR."
+    ))
+    db.commit()
+    
+    return {"message": f"Missione '{route_name}' approvata dal radar e pronta!"}
 # ==========================================
 # 2. ROTTE ESISTENTI (Lettura e Telegram Workflow)
 # ==========================================
