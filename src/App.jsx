@@ -48,12 +48,11 @@ const emergencyProtocols = [
     name: "Return to Home Diretto (RTH)",
     type: "action"
   },
-  
 ];
 
 export default function App() {
 
- // 🔒 CONTROLLO MULTI-SCHERMO PROTETTO
+  // 🔒 CONTROLLO MULTI-SCHERMO PROTETTO
   if (window.location.pathname === '/meteo' || window.location.hash === '#/meteo') {
     const savedToken = localStorage.getItem('control_room_token');
     
@@ -77,7 +76,8 @@ export default function App() {
   const mapCenter = [44.437475, 8.880381];
   const [token, setToken] = useState(null);
   const [userRole, setUserRole] = useState(null);
-const handleLoginSuccess = (jwtToken, role) => {
+
+  const handleLoginSuccess = (jwtToken, role) => {
     setToken(jwtToken);
     setUserRole(role);
     // Salva le credenziali nel browser per gli altri schermi
@@ -147,39 +147,51 @@ const handleLoginSuccess = (jwtToken, role) => {
   }, [missionPhase, activeMission]);
   // --- FINE LOGICA TELEGRAM WORKFLOW ---
 
-  useEffect(() => {
-    // 1. Definiamo la funzione asincrona internamente
-    const fetchMissions = async () => {
-      try {
-        const response = await fetch('http://127.0.0.1:8000/api/missions', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+  // --- FUNZIONE RECUPERO MISSIONI ESTRATTA ---
+  const fetchMissions = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/missions', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
         const data = await response.json();
         setServerMissions(data);
-      } catch (error) {
-        console.error("Connection error to Python server:", error);
       }
-    };
-
-    // 2. Eseguiamo la funzione SOLO se c'è un token valido
-    if (token) {
-      fetchMissions();
+    } catch (error) {
+      console.error("Connection error to Python server:", error);
     }
-    
-  // 3. Il token va qui, nelle parentesi quadre finali
+  };
+
+  // --- POLLING AUTOMATICO IN BACKGROUND ---
+  useEffect(() => {
+    if (token) {
+      fetchMissions(); // Scarica subito al login
+      
+      // Avvia l'intervallo per aggiornare la Sidebar ogni 5 secondi
+      const intervalId = setInterval(fetchMissions, 5000);
+      
+      // Cleanup: spegne il timer se l'utente si disconnette o smonta il componente
+      return () => clearInterval(intervalId);
+    }
   }, [token]);
   
   if (!token) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
+
   return (
     <div className="h-screen w-screen bg-neutral-900 text-white flex p-2 gap-2 font-sans overflow-hidden relative">
       
-      {/* IL PANNELLO ADMIN (Si sovrappone a tutto se lo stato è true) */}
+      {/* IL PANNELLO ADMIN (Passiamo fetchMissions come callback per il refresh istantaneo) */}
       {showAdminPanel && (
-        <AdminPanel token={token} onClose={() => setShowAdminPanel(false)} />
+        <AdminPanel 
+          token={token} 
+          onClose={() => setShowAdminPanel(false)} 
+          onMissionUploaded={fetchMissions} 
+        />
       )}
 
       {/* POP-UP MODAL */}
@@ -203,7 +215,7 @@ const handleLoginSuccess = (jwtToken, role) => {
       />
 
       {/* SEZIONE DESTRA (Sidebar) */}
-    <Sidebar 
+      <Sidebar 
         userRole={userRole}
         onOpenAdmin={() => setShowAdminPanel(true)}
         handleLogout={handleLogout}

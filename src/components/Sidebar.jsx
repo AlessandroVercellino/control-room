@@ -20,7 +20,6 @@ export default function Sidebar({
           Ruolo: <span className="text-blue-400 uppercase font-bold">{userRole}</span>
         </span>
         <div className="flex gap-2">
-          {/* IL BOTTONE ADMIN COLLEGATO ALLA PROP */}
           {userRole === 'responsabile' && (
             <button onClick={onOpenAdmin} className="bg-yellow-600/80 hover:bg-yellow-600 text-xs px-2 py-1 rounded transition border border-yellow-700">
               ⚙️ Admin
@@ -42,10 +41,22 @@ export default function Sidebar({
         {serverMissions.length === 0 ? (
           <div className="text-neutral-500 text-sm italic text-center p-4">Nessuna missione trovata.</div>
         ) : (
-          serverMissions.map((mission) => (
+          serverMissions.map((mission) => {
+            
+            // Variabile di blocco ricevuta dal radar in tempo reale
+            const isBlocked = mission.is_blocked;
+
+            return (
             <div 
               key={mission.mission_id}
               onClick={() => {
+                // SE È BLOCCATA DAL RADAR, FERMIAMO IL CLICK
+                if (isBlocked) {
+                  alert(`🚨 ACCESSO NEGATO: La missione "${mission.route}" incrocia la No-Fly Zone attiva "${mission.blocked_by}".`);
+                  return;
+                }
+
+                // Altrimenti, seleziona normalmente
                 setActiveMission({
                   id: mission.mission_id,
                   name: mission.route,
@@ -55,15 +66,40 @@ export default function Sidebar({
                 });
                 setMissionPhase('IDLE');
               }}
-              className={`p-3 rounded-lg text-sm cursor-pointer transition-all border ${activeMission?.id === mission.mission_id ? 'bg-blue-800/80 border-blue-400 shadow-lg' : 'bg-neutral-900/40 border-neutral-700 hover:border-neutral-500 hover:bg-neutral-700/50'}`}
+              // Cambiamo lo stile se è bloccata (Diventa rossa)
+              className={`p-3 rounded-lg text-sm transition-all border ${
+                isBlocked ? 'bg-red-950/50 border-red-800 hover:border-red-500 cursor-not-allowed opacity-80' : 
+                activeMission?.id === mission.mission_id ? 'bg-blue-800/80 border-blue-400 shadow-lg cursor-pointer' : 
+                'bg-neutral-900/40 border-neutral-700 hover:border-neutral-500 hover:bg-neutral-700/50 cursor-pointer'
+              }`}
             >
-              <div className="font-bold flex justify-between">
-                <span className="text-base">{mission.route}</span>
-                <span className="text-[10px] uppercase font-bold bg-green-700 text-green-100 px-2 py-1 rounded-full flex items-center">{mission.status}</span>
+              <div className="font-bold flex justify-between items-center">
+                <span className={`text-base ${isBlocked ? 'text-red-400 line-through' : 'text-white'}`}>
+                  {mission.route}
+                </span>
+                
+                {/* Badge Stato Dinamico */}
+                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full flex items-center ${
+                  isBlocked ? 'bg-red-900 text-red-200 animate-pulse' : 
+                  mission.status === 'PLANNED' ? 'bg-blue-700 text-blue-100' :
+                  mission.status === 'ACTIVE' ? 'bg-green-700 text-green-100' :
+                  'bg-neutral-700 text-neutral-100'
+                }`}>
+                  {isBlocked ? 'BLOCKED' : mission.status}
+                </span>
               </div>
-              <div className="text-xs text-neutral-400 mt-2">Piattaforma: <span className="text-white font-mono bg-neutral-800 px-1 rounded">{mission.drone}</span></div>
+
+              <div className="text-xs text-neutral-400 mt-2 flex justify-between items-end">
+                <span>Piattaforma: <span className="text-white font-mono bg-neutral-800 px-1 rounded">{mission.drone}</span></span>
+                {/* Se è bloccata, mostra chi è il colpevole */}
+                {isBlocked && (
+                  <span className="text-red-500 font-bold text-[10px]">
+                    NFZ: {mission.blocked_by}
+                  </span>
+                )}
+              </div>
               
-             {activeMission?.id === mission.mission_id && (
+             {activeMission?.id === mission.mission_id && !isBlocked && (
                 <div className="mt-3 flex flex-col gap-2 border-t border-neutral-600 pt-3">
                   <button 
                     onClick={(e) => {
@@ -77,7 +113,7 @@ export default function Sidebar({
                 </div>
               )}
             </div>
-          ))
+          )})
         )}
       </div>
 

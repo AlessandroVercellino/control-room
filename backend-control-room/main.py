@@ -164,40 +164,6 @@ def create_drone(drone: DroneCreate, db: Session = Depends(get_db)):
     db.commit()
     return {"message": f"Drone {drone.name} registered successfully!"}
 
-@app.post("/api/missions/upload")
-async def upload_mission(
-    route_name: str = Form(...),
-    drone_id: int = Form(...),
-    pilot_id: int = Form(...),
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    upload_dir = "uploaded_missions"
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    file_path = os.path.join(upload_dir, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    new_plan = FlightPlan(route_name=route_name, file_path=file_path, details="Uploaded via Admin Panel")
-    db.add(new_plan)
-    db.commit()
-    db.refresh(new_plan)
-    
-    new_mission = Mission(flight_plan_id=new_plan.id, drone_id=drone_id, pilot_id=pilot_id, status="PLANNED")
-    db.add(new_mission)
-    db.commit()
-    db.refresh(new_mission)
-    
-    # 📝 LOG: New flight plan registered
-    db.add(SystemLog(
-        user_id=pilot_id,
-        action_type="MISSION_UPLOADED",
-        description=f"UgCS flight plan '{route_name}' uploaded (Mission ID: {new_mission.id}). Assigned to drone ID {drone_id}"
-    ))
-    db.commit()
-    
-    return {"message": f"Mission '{route_name}' ready for flight!"}
 
 # ==========================================
 # 🛑 ROUTES FOR NO-FLY ZONES (Geo-Fencing)
@@ -273,6 +239,38 @@ def delete_nfz(nfz_id: int, db: Session = Depends(get_db)):
         ))
         db.commit()
     return {"message": "No-Fly Zone successfully deactivated."}
+
+@app.post("/api/nfz/draw")
+def create_drawn_nfz(nfz: NFZCreate, db: Session = Depends(get_db)):
+    """Salva una No-Fly Zone disegnata a mano dalla mappa React"""
+    coords = nfz.coordinates
+    
+    if len(coords) < 3:
+        raise HTTPException(status_code=400, detail="Errore: Un poligono richiede almeno 3 punti.")
+
+    # PostGIS esige che i poligoni siano "chiusi" (il primo e l'ultimo punto devono coincidere)
+    if coords[0] != coords[-1]:
+        coords.append(coords[0]) 
+        
+    # Creiamo la stringa WKT. Attenzione: PostGIS vuole prima la Longitudine e poi la Latitudine!
+    polygon_wkt = "POLYGON((" + ", ".join([f"{lon} {lat}" for lon, lat in coords]) + "))"
+    
+    db_nfz = NoFlyZone(
+        name=nfz.name,
+        description=nfz.description,
+        geometry=func.ST_GeomFromText(polygon_wkt, 4326),
+        active=True
+    )
+    db.add(db_nfz)
+    
+    # Registriamo l'azione nell'Audit Trail
+    db.add(SystemLog(
+        action_type="NFZ_DRAWN",
+        description=f"Operatore ha disegnato e attivato manualmente la No-Fly Zone: '{nfz.name}'"
+    ))
+    db.commit()
+    
+    return {"message": f"No-Fly Zone '{nfz.name}' salvata e attivata sul radar!"}
 
 
 # ==========================================
@@ -387,12 +385,28 @@ def get_missions(db: Session = Depends(get_db)):
 
         waypoints = extract_waypoints_from_ugcs(m.plan.file_path) if m.plan else []
 
+        is_blocked = False
+        blocked_by = ""
+
+        # Se la missione ha una geometria, controlliamo se tocca una NFZ attiva in questo esatto momento
+        if m.plan and m.plan.route_geometry:
+            violation = db.query(NoFlyZone).filter(
+                NoFlyZone.active == True,
+                func.ST_Intersects(NoFlyZone.geometry, m.plan.route_geometry)
+            ).first()
+            
+            if violation:
+                is_blocked = True
+                blocked_by = violation.name
+
         result.append({
             "mission_id": m.id,
             "route": m.plan.route_name if m.plan else "Sconosciuta",
             "status": m.status,
             "drone": m.drone.name if m.drone else "N/A",
             "waypoints": waypoints,
+            "is_blocked": is_blocked,
+            "blocked_by": blocked_by,
             "details": {
                 "max_altitude_m": 120,
                 "total_waypoints": len(waypoints),

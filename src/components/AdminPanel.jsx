@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import AdminNFZManager from './AdminNFZManager';
 
-export default function AdminPanel({ token, onClose }) {
+export default function AdminPanel({ token, onClose,onMissionUploaded }) {
   // Stati per scaricare i dati necessari dai menu a tendina
   const [users, setUsers] = useState([]);
   const [drones, setDrones] = useState([]);
@@ -75,6 +76,7 @@ export default function AdminPanel({ token, onClose }) {
         alert("Missione caricata nel Database e pronta al volo!");
         setMissionForm({ route_name: '', drone_id: '', pilot_id: '' });
         setSelectedFile(null);
+        if(onMissionUploaded) onMissionUploaded(); // Notifica al componente genitore che una missione è stata caricata
     } else {
         const errorData = await response.json();
         alert(errorData.detail || "Errore durante il caricamento della missione");
@@ -188,49 +190,11 @@ export default function AdminPanel({ token, onClose }) {
             </form>
           </div>
         </div>
-
-        {/* NUOVA SEZIONE: GESTIONE SPAZIO AEREO (NO-FLY ZONES) */}
-        <div className="mt-8 bg-neutral-800 border border-red-900/50 p-6 rounded-xl shadow-lg relative overflow-hidden">
-          {/* Sfondo decorativo rosso tenue */}
-          <div className="absolute top-0 left-0 w-2 h-full bg-red-600"></div>
-          
-          <h2 className="text-2xl text-red-400 font-bold mb-4 ml-4">🛡️ Gestione Spazio Aereo (Geo-Fencing)</h2>
-          <p className="text-neutral-400 mb-6 ml-4">Carica un poligono esportato da UgCS per interdire lo spazio aereo. I piani di volo che intersecano queste aree verranno bloccati automaticamente.</p>
-          
-          <form onSubmit={handleNfzSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end ml-4">
-            
-            <div className="flex flex-col gap-1 md:col-span-1">
-              <label className="text-sm text-neutral-400 font-bold">Nome Area Interdetta</label>
-              <input required type="text" placeholder="es. Ciminiera Nord" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={nfzForm.name} onChange={e => setNfzForm({...nfzForm, name: e.target.value})} />
-            </div>
-
-            <div className="flex flex-col gap-1 md:col-span-1">
-              <label className="text-sm text-neutral-400 font-bold">Motivazione (Opzionale)</label>
-              <input type="text" placeholder="es. Manutenzione in corso..." className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={nfzForm.description} onChange={e => setNfzForm({...nfzForm, description: e.target.value})} />
-            </div>
-
-            <div className="border-2 border-dashed border-red-500/50 rounded-lg p-2 text-center bg-neutral-900 relative hover:bg-neutral-800 transition md:col-span-1 h-[42px] flex items-center justify-center">
-              <input 
-                type="file" 
-                accept=".json"
-                onChange={e => setSelectedNfzFile(e.target.files[0])}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <div className="text-neutral-400 pointer-events-none text-sm w-full truncate px-2">
-                {selectedNfzFile ? (
-                  <span className="text-red-400 font-bold">📄 {selectedNfzFile.name}</span>
-                ) : (
-                  <span>Seleziona file UgCS (.json)</span>
-                )}
-              </div>
-            </div>
-
-            <button type="submit" className="bg-red-600 text-white font-bold p-2 h-[42px] rounded hover:bg-red-500 transition md:col-span-1 shadow-[0_0_15px_rgba(220,38,38,0.3)]">
-              Attiva Radar NFZ
-            </button>
-
-          </form>
-        </div>
+      
+      {/* SEZIONE NO-FLY ZONE */}
+      <div className="mt-8">
+        <AdminNFZManager />
+      </div>
 
       </div>
     </div>
