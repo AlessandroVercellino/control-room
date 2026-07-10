@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-// Definizione dei Tab con i rispettivi colori (presi dal tuo mockup)
 const TABS = [
   { id: 'Droni', label: 'Droni', dotColor: 'bg-yellow-500' },
   { id: 'Payload', label: 'Payload', dotColor: 'bg-cyan-500' },
   { id: 'Meteo', label: 'Meteo', dotColor: 'bg-green-500' },
-  { id: 'Sicurezza', label: 'Sicurezza', dotColor: 'bg-red-500', isAlert: true }, // isAlert a true lo fa lampeggiare!
+  { id: 'Sicurezza', label: 'Sicurezza', dotColor: 'bg-red-500', isAlert: true },
   { id: 'Reti', label: 'Reti', dotColor: 'bg-orange-500' },
   { id: 'Piloti', label: 'Piloti', dotColor: 'bg-blue-500' },
   { id: 'RID', label: 'RID', dotColor: 'bg-fuchsia-500' },
@@ -14,88 +13,113 @@ const TABS = [
 
 export default function DashboardPanel() {
   const [activeTab, setActiveTab] = useState('Droni');
+  const [liveDrones, setLiveDrones] = useState({});
 
-  // RENDERIZZAZIONE CONDIZIONALE DEI CONTENUTI
+  // 🔌 CONNESSIONE WEBSOCKET PER TELEMETRIA REALE
+  useEffect(() => {
+    const ws = new WebSocket('ws://127.0.0.1:8000/ws/telemetry');
+    
+    ws.onopen = () => console.log("🟢 Connesso al WebSocket della Telemetria!");
+    
+    ws.onmessage = (event) => {
+      try {
+        const telemetria = JSON.parse(event.data);
+        console.log("🚁 DATI REALI DAL DRONE:", telemetria);
+        const droneId = telemetria.drone.id;
+        setLiveDrones(prevDrones => ({
+          ...prevDrones,
+          [droneId]: telemetria
+        }));
+      } catch (error) {
+        console.error("Errore di lettura dati telemetria:", error);
+      }
+    };
+
+    ws.onclose = () => console.log("🔴 Connessione WebSocket persa.");
+    return () => ws.close();
+  }, []);
+
+  const getFlightStatus = (statusId) => {
+    if (statusId === 0) return { text: "A TERRA", style: "bg-neutral-500/20 text-neutral-400" };
+    if (statusId === 1) return { text: "ARMATO", style: "bg-yellow-500/20 text-yellow-400 animate-pulse" };
+    if (statusId === 2) return { text: "IN VOLO", style: "bg-green-500/20 text-green-400 font-bold" };
+    return { text: "SCONOSCIUTO", style: "bg-red-500/20 text-red-400" };
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'Droni':
+        const activeDronesArray = Object.values(liveDrones);
         return (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-white">
-              <thead className="text-xs uppercase text-neutral-400 border-b border-neutral-700">
-                <tr>
-                  <th className="px-4 py-2">Name</th>
-                  <th className="px-4 py-2">Model</th>
-                  <th className="px-4 py-2">Payload</th>
-                  <th className="px-4 py-2">Mode</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Altitude AGL</th>
-                  <th className="px-4 py-2">Vertical Speed</th>
-                  <th className="px-4 py-2">Ground Speed</th>
-                  <th className="px-4 py-2">Separation</th>
-                  <th className="px-4 py-2">Battery</th>
-                  <th className="px-4 py-2">GPS Fix</th>
-                  <th className="px-4 py-2">Datalink</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* DRONE 1 */}
-                <tr className="border-b border-neutral-800 bg-neutral-900/50">
-                  <td className="px-4 py-2 font-bold bg-yellow-400 text-black">DRONE 1</td>
-                  <td className="px-4 py-2">MATRICE 350 RTK</td>
-                  <td className="px-4 py-2">VOC SENSOR</td>
-                  <td className="px-4 py-2 bg-green-500/20 text-green-400 font-bold">ARMED</td>
-                  <td className="px-4 py-2 bg-green-500/20 text-green-400 font-bold">FLIGHT</td>
-                  <td className="px-4 py-2">36.4</td>
-                  <td className="px-4 py-2 text-green-400">0.2</td>
-                  <td className="px-4 py-2">1.2</td>
-                  <td className="px-4 py-2">212</td>
-                  <td className="px-4 py-2">66%</td>
-                  <td className="px-4 py-2">3D FIX</td>
-                  <td className="px-4 py-2">85%</td>
-                </tr>
-                {/* DRONE 2 */}
-                <tr className="border-b border-neutral-800 bg-neutral-900/50">
-                  <td className="px-4 py-2 font-bold bg-cyan-500 text-black">DRONE 2</td>
-                  <td className="px-4 py-2">MAVIC 3E RTK</td>
-                  <td className="px-4 py-2 text-neutral-500">N/A</td>
-                  <td className="px-4 py-2 bg-green-500/20 text-green-400 font-bold">ARMED</td>
-                  <td className="px-4 py-2 bg-green-500/20 text-green-400 font-bold">FLIGHT</td>
-                  <td className="px-4 py-2">52.8</td>
-                  <td className="px-4 py-2 text-red-400">-0.1</td>
-                  <td className="px-4 py-2">0.5</td>
-                  <td className="px-4 py-2">188</td>
-                  <td className="px-4 py-2">80%</td>
-                  <td className="px-4 py-2">3D FIX</td>
-                  <td className="px-4 py-2">99%</td>
-                </tr>
-                {/* UNAUTHORIZED DRONE */}
-                <tr className="bg-red-600 font-bold">
-                  <td className="px-4 py-2">UNAUTHORIZED 1</td>
-                  <td className="px-4 py-2">MINI 4 PRO</td>
-                  <td className="px-4 py-2">UNKNOWN</td>
-                  <td className="px-4 py-2"></td>
-                  <td className="px-4 py-2">FLIGHT</td>
-                  <td className="px-4 py-2">65.2</td>
-                  <td className="px-4 py-2">0.0</td>
-                  <td className="px-4 py-2">12.6</td>
-                  <td className="px-4 py-2">188</td>
-                  <td className="px-4 py-2 text-neutral-300">N/A</td>
-                  <td className="px-4 py-2 text-neutral-300">N/A</td>
-                  <td className="px-4 py-2 text-neutral-300">N/A</td>
-                </tr>
-              </tbody>
-            </table>
+            {activeDronesArray.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500 font-mono animate-pulse">
+                IN ATTESA DI CONNESSIONE TELEMETRICA DAL DRONE...
+              </div>
+            ) : (
+              <table className="w-full text-left text-sm text-white">
+                <thead className="text-xs uppercase text-neutral-400 border-b border-neutral-700">
+                  <tr>
+                    <th className="px-4 py-2">ID</th>
+                    <th className="px-4 py-2">Model</th>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Altitude (AGL/ASL)</th>
+                    <th className="px-4 py-2">Vertical Speed</th>
+                    <th className="px-4 py-2">Ground Speed</th>
+                    <th className="px-4 py-2">Battery</th>
+                    <th className="px-4 py-2">GPS Sats</th>
+                    <th className="px-4 py-2">Avoidance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeDronesArray.map((droneData) => {
+                    const statusInfo = getFlightStatus(droneData.status.inFlight);
+                    const groundSpeed = Math.sqrt(Math.pow(droneData.velocity.linear.x, 2) + Math.pow(droneData.velocity.linear.y, 2)).toFixed(1);
+                    
+                    return (
+                      <tr key={droneData.drone.id} className="border-b border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 transition">
+                        <td className="px-4 py-2 font-bold bg-yellow-400 text-black w-24">DRONE {droneData.drone.id}</td>
+                        <td className="px-4 py-2">{droneData.drone.type}</td>
+                        <td className="px-4 py-2">
+                          <span className={`px-2 py-1 rounded text-xs ${statusInfo.style}`}>
+                            {statusInfo.text}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 font-mono text-xs">
+                          <div className="text-cyan-400 font-bold">
+                            {droneData.position?.relative?.height !== undefined 
+                              ? `${droneData.position.relative.height.toFixed(1)} m AGL` 
+                              : 'N/A AGL'}
+                          </div>
+                          <div className="text-neutral-500">
+                            {droneData.position?.global?.altitude !== undefined 
+                              ? `${droneData.position.global.altitude.toFixed(1)} m ASL` 
+                              : 'N/A ASL'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 font-mono">{droneData.velocity.linear.z.toFixed(1)} m/s</td>
+                        <td className="px-4 py-2 font-mono">{groundSpeed} m/s</td>
+                        <td className="px-4 py-2">
+                          <span className={`font-bold ${droneData.battery.percentage < 20 ? 'text-red-500 animate-pulse' : 'text-green-400'}`}>
+                            {droneData.battery.percentage}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">{droneData.gps.satelliteNumber} Sats</td>
+                        <td className="px-4 py-2">
+                          {droneData.avoidance.distance.front < 3 ? (
+                            <span className="text-red-500 font-bold animate-ping">ALARM</span>
+                          ) : (
+                            <span className="text-green-500">CLEAR</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         );
-      case 'Payload':
-        return <div className="p-4 text-neutral-400">📊 Flusso dati payload (Termocamere, Sniffer VOC) in attesa di connessione...</div>;
-      case 'Meteo':
-        return <div className="p-4 text-neutral-400">🌤️ Dati stazioni meteo: Vento 12 nodi da N/NE - Umidità 65%</div>;
-      case 'Reti':
-        return <div className="p-4 text-neutral-400">📡 Connessione MQTT attiva. Latenza: 24ms</div>;
-      case 'Piloti':
-        return <div className="p-4 text-neutral-400">👨‍✈️ Piloti operativi: Alessandro (Badge: admin123)</div>;
       default:
         return <div className="p-4 text-neutral-400">Contenuto in fase di sviluppo.</div>;
     }
@@ -103,35 +127,19 @@ export default function DashboardPanel() {
 
   return (
     <div className="h-full w-full bg-[#1e1e1e] border border-neutral-700 rounded-lg flex flex-col">
-      
-      {/* BARRA SUPERIORE (BOTTONI/TAB) */}
       <div className="flex flex-wrap items-center gap-3 p-4 border-b border-neutral-800 bg-[#141414] rounded-t-lg">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm transition-all duration-200
-                ${isActive ? 'bg-neutral-700 text-white shadow-inner' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'}
-                ${tab.isAlert ? 'border border-red-500 animate-pulse' : 'border border-transparent'}
-              `}
-            >
-              {/* Pallino colorato */}
-              <span className={`w-3 h-3 rounded-full ${tab.dotColor} ${tab.isAlert ? 'animate-ping' : ''}`}></span>
-              {tab.label}
-            </button>
-          );
-        })}
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${activeTab === tab.id ? 'bg-neutral-700 text-white shadow-inner' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'} ${tab.isAlert ? 'border border-red-500 animate-pulse' : ''}`}
+          >
+            <span className={`w-3 h-3 rounded-full ${tab.dotColor}`}></span>
+            {tab.label}
+          </button>
+        ))}
       </div>
-
-      {/* AREA CONTENUTO INFERIORE */}
-      <div className="flex-1 overflow-y-auto p-2">
-        {renderContent()}
-      </div>
-
+      <div className="flex-1 overflow-y-auto p-2">{renderContent()}</div>
     </div>
   );
 }

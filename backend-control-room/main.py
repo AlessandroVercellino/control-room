@@ -16,6 +16,8 @@ import math
 import requests
 import threading
 import time
+import asyncio
+from telemetry_manager import manager, start_mqtt_bridge
 # Importiamo le tabelle dal tuo database
 from database import SessionLocal, Drone, Mission, User, FlightPlan, SystemLog , NoFlyZone
 
@@ -492,6 +494,7 @@ def telegram_polling():
 def startup_event():
     print("🚀 Avvio sistema di ascolto Telegram in background...")
     threading.Thread(target=telegram_polling, daemon=True).start()
+    start_mqtt_bridge(asyncio.get_running_loop())
 
 # ==========================================
 # 🚀 WORKFLOW ROUTES (With Operational Logs)
@@ -547,10 +550,9 @@ def get_mission_status(mission_id: str):
 # ==========================================
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry(websocket: WebSocket):
-    await websocket.accept()
+    await manager.connect(websocket)
     try:
         while True:
-            data = await websocket.receive_text()
-            await websocket.send_text(data)
+            await websocket.receive_text()
     except WebSocketDisconnect:
-        pass
+        manager.disconnect(websocket)

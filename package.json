@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "^2.20.0",
+    "cesium": "^1.143.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.17.0",
     "react": "^19.2.5",
@@ -32,6 +33,7 @@
     "globals": "^17.5.0",
     "postcss": "^8.5.12",
     "tailwindcss": "^4.2.4",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vite-plugin-cesium": "^1.2.23"
   }
 }
