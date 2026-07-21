@@ -2,10 +2,34 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
-// 🏠 COORDINATE DI DEFAULT (Raffineria di Fegino)
-const HOME_LON = 8.880194;
-const HOME_LAT = 44.435585;
-const HOME_ALT = 98.0; // Quota del terreno a Fegino
+// 🏠 COORDINATE DI DEFAULT (Raffineria di Fegino) — usate SOLO per la camera iniziale
+const HOME_LON = 8.880966;
+const HOME_LAT = 44.43683;
+const HOME_ALT = 102.9999999997; // Quota del terreno a Fegino
+
+// ============================================================================
+// 🎯 ORIGINE DI GEOREFERENZIAZIONE DEL DIGITAL TWIN (splat/tileset)
+// ----------------------------------------------------------------------------
+// Questi valori NON vanno indovinati: sono l'output dello script Python di
+// georeferenziazione (georeference_splat.py) che calcola la trasformazione di
+// similarità (scala + rotazione + traslazione) dalle pose camera RealityCapture
+// confrontate con i GPS EXIF delle foto del drone.
+//
+// Lo script trasforma tutti i punti dello splat in coordinate locali ENU
+// (East-North-Up, in metri) centrate su questa origine. Qui in Cesium basta
+// una sola trasformazione standard (eastNorthUpToFixedFrame) per posizionare
+// l'intero tileset nel punto giusto del globo, con l'orientamento corretto:
+// NON serve più nessuna rotazione o scala "a mano".
+//
+// ⚠️ SOSTITUISCI questi tre valori con quelli stampati in output dallo script
+// Python quando lo lanci sui tuoi file reali (registration.csv + foto + .ply).
+// ============================================================================
+const TILESET_ORIGIN_LON = 8.880966;   // <-- placeholder, sostituisci con l'output dello script
+const TILESET_ORIGIN_LAT = 44.43683;   // <-- placeholder, sostituisci con l'output dello script
+const TILESET_ORIGIN_ALT = 102.9999999997; // <-- placeholder, sostituisci con l'output dello script
+
+// ID dell'asset Cesium ion del tileset generato dallo splat georeferenziato
+const DIGITAL_TWIN_ASSET_ID = 5075529;
 
 export default function CesiumDigitalTwin({ telemetry }) {
   const cesiumContainer = useRef(null);
@@ -42,13 +66,43 @@ export default function CesiumDigitalTwin({ telemetry }) {
     // Caricamento del Digital Twin
     const loadEnvironment = async () => {
       try {
-        const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(5032873);
+        const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(DIGITAL_TWIN_ASSET_ID);
+
+        // --- NIENTE TRASFORMAZIONE MANUALE ---
+        // Il tileset su Cesium ion e' GIA' georeferenziato correttamente
+        // (lo vediamo posizionato bene nel preview di ion stesso): la
+        // trasformazione ENU -> ECEF e' gia' incorporata nel tileset.json
+        // generato da ion durante la elaborazione dell'asset.
+        //
+        // Applicare qui in piu' un'altra Cesium.Transforms.eastNorthUpToFixedFrame
+        // la SOMMEREBBE a quella gia' presente nel tileset, raddoppiando la
+        // trasformazione e mandando il modello in una posizione completamente
+        // sbagliata (spesso vicino al centro della Terra, in coordinate ECEF
+        // vicine a (0,0,0)) - motivo per cui il modello e' "sparito nel vuoto"
+        // nella control room mentre nel preview di ion era perfetto.
+        //
+        // Se in futuro caricherai un tileset NON pre-georeferenziato da ion
+        // (es. un tileset generico senza geo-reference specificato in fase di
+        // upload), allora servira' impostare qui:
+        //   const originCartesian = Cesium.Cartesian3.fromDegrees(
+        //     TILESET_ORIGIN_LON, TILESET_ORIGIN_LAT, TILESET_ORIGIN_ALT
+        //   );
+        //   tileset.modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(originCartesian);
+        // ma NON in aggiunta a una georeferenziazione gia' presente nel tileset.
+
+        // Aggiungiamo alla scena
         viewer.scene.primitives.add(tileset);
+
+        // Facciamo volare la telecamera sul modello per centrarlo subito
+        viewer.zoomTo(tileset);
+
       } catch (error) {
         console.error("Errore caricamento Digital Twin:", error);
       }
     };
+
     loadEnvironment();
+
 
     // Creazione del Drone con posizione iniziale fissa a Fegino
     droneEntityRef.current = viewer.entities.add({

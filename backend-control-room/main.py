@@ -18,7 +18,6 @@ import threading
 import time
 import asyncio
 from telemetry_manager import manager, start_mqtt_bridge
-# Importiamo le tabelle dal tuo database
 from database import SessionLocal, Drone, Mission, User, FlightPlan, SystemLog , NoFlyZone
 
 app = FastAPI()
@@ -435,7 +434,14 @@ def telegram_polling():
     
     while True:
         try:
-            response = requests.get(url, params={"offset": LAST_UPDATE_ID, "timeout": 5}, timeout=10).json()
+            # 🛠️ IL FIX: Passiamo allowed_updates in formato JSON
+            params = {
+                "offset": LAST_UPDATE_ID, 
+                "timeout": 20, # Il server di Telegram aspetterà fino a 20 secondi
+                "allowed_updates": json.dumps(["message", "callback_query"])
+            }
+
+            response = requests.get(url, params=params, timeout=25).json()
             if response.get("ok"):
                 for result in response.get("result", []):
                     LAST_UPDATE_ID = result["update_id"] + 1
@@ -485,6 +491,9 @@ def telegram_polling():
                             })
                         
                         db.close() # Close thread session
+        except requests.ReadTimeout:
+            # È scattato il timeout di 25 secondi. Tutto regolare, il ciclo riparte senza stampare errori.
+            pass
         except Exception as e:
             print(f"Telegram polling error: {e}")
         time.sleep(1)
