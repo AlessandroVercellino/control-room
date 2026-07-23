@@ -1,53 +1,30 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// 1. IMPORTIAMO LE EMERGENZE LOCALMENTE (Il Database non c'entra, sicurezza al 100%)
-import emergenzaData from './data/ugcs/emergenza.json';
 import Login from './Login';
 import WeatherScreen from './WeatherScreen';
 import MissionModal from './components/MissionModal';
 import MapPanel from './components/MapPanel';
 import Sidebar from './components/Sidebar';
 import AdminPanel from './components/AdminPanel';
-//import RTH from './data/ugcs/rth.json';
+import { API_BASE_URL, WS_BASE_URL } from './config';
 
-function extractUgcsWaypoints(ugcsJson) {
-  let points = [];
-  function searchPoints(obj) {
-    if (!obj) return;
-    if (typeof obj.latitude === 'number' && typeof obj.longitude === 'number') {
-      points.push([obj.latitude * (180 / Math.PI), obj.longitude * (180 / Math.PI)]);
-    } else if (Array.isArray(obj)) {
-      obj.forEach(item => searchPoints(item));
-    } else if (typeof obj === 'object') {
-      Object.values(obj).forEach(val => searchPoints(val));
-    }
-  }
-  try { searchPoints(ugcsJson); } catch (e) { console.error("Error:", e); }
-  return points;
-}
-
-// 2. LA NOSTRA LISTA DEI PROTOCOLLI DI EMERGENZA (Sempre disponibili)
+// Lista dei protocolli di emergenza (comandi diretti al drone via MQTT)
 const emergencyProtocols = [
   {
-    id: "E1", 
-    name: "Rotta Failsafe (Perdita Segnale)", 
-    type: "route",
-    color: "red",
-    waypoints: extractUgcsWaypoints(emergenzaData),
-    details: {
-      max_altitude_m: 120.0,
-      total_waypoints: extractUgcsWaypoints(emergenzaData).length,
-      source_software: "Failsafe System Local",
-      flight_type: "Emergency Pre-Planned Route"
-    }
+    id: "E2",
+    name: "Direct Return to Home (RTH)",
+    type: "action",
+    actionType: "Return_home"
   },
   {
-    id: "E2",
-    name: "Return to Home Diretto (RTH)",
-    type: "action"
-  },
+    id: "E3",
+    name: "Immediate Landing (Land)",
+    type: "action",
+    actionType: "Land"
+  }
 ];
 
 export default function App() {
@@ -55,13 +32,11 @@ export default function App() {
   // 🔒 CONTROLLO MULTI-SCHERMO PROTETTO
   if (window.location.pathname === '/meteo' || window.location.hash === '#/meteo') {
     const savedToken = localStorage.getItem('control_room_token');
-    
-    // Se non c'è il token nel localStorage, l'accesso viene negato istantaneamente
     if (!savedToken) {
       return (
         <div className="h-screen w-screen bg-black text-red-500 flex flex-col items-center justify-center font-mono p-4 border-4 border-red-900">
-          <div className="text-3xl font-black tracking-widest animate-pulse">⚠️ SECURITY VIOLATION</div>
-          <div className="text-sm text-neutral-500 mt-2 uppercase tracking-wider">Accesso negato. Inizializzare la connessione dalla Control Room principale.</div>
+          <div className="text-3xl font-black tracking-widest animate-pulse">SECURITY VIOLATION</div>
+          <div className="text-sm text-neutral-500 mt-2 uppercase tracking-wider">Access denied. Initialize the connection from the main Control Room.</div>
         </div>
       );
     }
@@ -71,16 +46,14 @@ export default function App() {
   const [activeMission, setActiveMission] = useState(null);
   const [serverMissions, setServerMissions] = useState([]);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const mapCenter = [44.437475, 8.880381];
-  const [token, setToken] = useState(null);
-  const [userRole, setUserRole] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('control_room_token') || null);
+  const [userRole, setUserRole] = useState(localStorage.getItem('control_room_role') || null);
 
   const handleLoginSuccess = (jwtToken, role) => {
     setToken(jwtToken);
     setUserRole(role);
-    // Salva le credenziali nel browser per gli altri schermi
     localStorage.setItem('control_room_token', jwtToken);
     localStorage.setItem('control_room_role', role);
   };
@@ -88,53 +61,153 @@ export default function App() {
   const handleLogout = () => {
     setToken(null);
     setUserRole(null);
-    // Pulisce il browser alla disconnessione
     localStorage.removeItem('control_room_token');
     localStorage.removeItem('control_room_role');
   };
 
-  // --- INIZIO LOGICA TELEGRAM WORKFLOW ---
-  const [missionPhase, setMissionPhase] = useState('IDLE'); // IDLE, AWAITING_APPROVAL, READY
+  // --- LOGICA TELEGRAM & WORKFLOW LANCIO ---
+  const [missionPhase, setMissionPhase] = useState('IDLE');
   const [approvals, setApprovals] = useState({ pilot: false, manager: false });
 
   const handleRequestDispatch = async (e) => {
-    e.stopPropagation(); // Evita di ricaricare la mappa quando clicchi il bottone
+    if (e) e.stopPropagation();
     setMissionPhase('AWAITING_APPROVAL');
     setApprovals({ pilot: false, manager: false });
     try {
-      await fetch("http://127.0.0.1:8000/api/mission/request-clearance", {
+      await fetch(`${API_BASE_URL}/api/mission/request-clearance`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ mission_id: activeMission.id, mission_name: activeMission.name })
       });
     } catch (err) { console.error("Errore Telegram:", err); }
   };
 
   const handleManagerApprove = async (e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     try {
-      await fetch(`http://127.0.0.1:8000/api/mission/approve-manager/${activeMission.id}`, { method: "POST" });
+      await fetch(`${API_BASE_URL}/api/mission/approve-manager/${activeMission.id}`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
       setApprovals(prev => ({ ...prev, manager: true }));
     } catch (err) { console.error(err); }
   };
 
+  // 🔥 1. INVIO REALE MISSIONE WAYPOINT VIA WEBSOCKET (MQTT)
   const handleUploadAndLaunch = (e) => {
-    e.stopPropagation();
-    alert("🚀 PIANO DI VOLO CARICATO SUL DRONE! Inizio sequenza di armamento...");
-    setMissionPhase('IDLE'); // Resetta l'interfaccia
+    if (e) e.stopPropagation();
+
+    if (!activeMission || !activeMission.mqtt_payload) {
+      console.error("⚠️ Impossibile inviare: payload MQTT mancante nella missione attiva.");
+      alert("Error: no valid waypoint data available to send to the drone.");
+      return;
+    }
+
+    // Costruiamo il JSON finale rispettando lo schema mission_waypoint.schema_2.json[cite: 11]
+    const payloadToDrone = {
+      drone_id: 1, 
+      gcs_id: 1,   
+      mission_type: "Waypoint", 
+      mission: activeMission.mqtt_payload 
+    };
+
+    // Inviamo il comando e ASPETTIAMO la conferma reale dal backend (publish_mqtt riuscita o no)
+    const wsCommand = new WebSocket(`${WS_BASE_URL}/ws/commands`);
+
+    wsCommand.onopen = () => {
+      console.log("🟢 Connesso al canale comandi WebSocket. Invio Waypoint in corso...");
+      wsCommand.send(JSON.stringify({
+        action: "publish_mqtt",
+        topic: "missions",
+        payload: payloadToDrone
+      }));
+      console.log("🚀 PAYLOAD WAYPOINT INVIATO AL BACKEND:", payloadToDrone);
+    };
+
+    wsCommand.onmessage = (event) => {
+      const response = JSON.parse(event.data);
+      wsCommand.close();
+
+      if (response.status === "ok") {
+        setMissionPhase('IDLE');
+        setShowDetailsModal(false);
+        alert("FLIGHT PLAN UPLOADED TO THE DRONE VIA MQTT!");
+      } else {
+        console.error("🔴 Publish MQTT fallita:", response.detail);
+        alert(`SEND FAILED: ${response.detail || "the MQTT broker did not confirm publication."}`);
+      }
+    };
+
+    wsCommand.onerror = (err) => {
+      console.error("🔴 Errore durante l'invio del comando di volo:", err);
+      alert("WebSocket connection error during launch.");
+    };
   };
 
-  // Polling: Controlla ogni secondo se hai cliccato sul telefono
+  // 🔥 2. GESTIONE AZIONI DI EMERGENZA (RTH / LAND) - invio diretto pacchetto Emergency via MQTT
+  const handleEmergencyAction = (protocol) => {
+    const emergencyPayload = {
+      drone_id: 1,
+      gcs_id: 1,
+      action: "Emergency",
+      parameter: {
+        emergency: protocol.actionType // "Return_home" o "Land"
+      }
+    };
+
+    const wsCommand = new WebSocket(`${WS_BASE_URL}/ws/commands`);
+
+    wsCommand.onopen = () => {
+      wsCommand.send(JSON.stringify({
+        action: "publish_mqtt",
+        topic: "actions",
+        payload: emergencyPayload
+      }));
+      console.log("🚨 COMANDO DI EMERGENZA INVIATO AL BACKEND:", emergencyPayload);
+    };
+
+    wsCommand.onmessage = (event) => {
+      const response = JSON.parse(event.data);
+      wsCommand.close();
+
+      if (response.status === "ok") {
+        alert(`EMERGENCY COMMAND (${protocol.name}) SENT TO THE DRONE!`);
+      } else {
+        console.error("🔴 Publish MQTT emergenza fallita:", response.detail);
+        alert(`EMERGENCY COMMAND NOT SENT: ${response.detail || "the MQTT broker did not confirm publication."}`);
+      }
+    };
+
+    wsCommand.onerror = (err) => {
+      console.error("🔴 Errore WebSocket comando emergenza:", err);
+      alert("WebSocket connection error while sending the emergency command.");
+    };
+  };
+
+  // Polling approvazioni Telegram
   useEffect(() => {
     let interval = null;
     if (missionPhase === 'AWAITING_APPROVAL' && activeMission) {
       interval = setInterval(async () => {
         try {
-          const response = await fetch(`http://127.0.0.1:8000/api/mission/status/${activeMission.id}`);
+          const response = await fetch(`${API_BASE_URL}/api/mission/status/${activeMission.id}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
           if (response.ok) {
             const data = await response.json();
+
+            if (data.pilot_rejected) {
+              clearInterval(interval);
+              setApprovals({ pilot: false, manager: false });
+              setMissionPhase('IDLE');
+              alert('Mission REJECTED by the pilot via Telegram. Operation cancelled.');
+              return;
+            }
+
             setApprovals({ pilot: data.pilot_approved, manager: data.manager_approved });
-            // Se entrambi i semafori sono verdi, sblocca il lancio
             if (data.pilot_approved && data.manager_approved) {
               setMissionPhase('READY');
               clearInterval(interval);
@@ -144,17 +217,14 @@ export default function App() {
       }, 1000);
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [missionPhase, activeMission]);
-  // --- FINE LOGICA TELEGRAM WORKFLOW ---
+  }, [missionPhase, activeMission, token]);
 
-  // --- FUNZIONE RECUPERO MISSIONI ESTRATTA ---
+  // Recupero missioni dal Backend
   const fetchMissions = async () => {
     if (!token) return;
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/missions', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await fetch(`${API_BASE_URL}/api/missions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         const data = await response.json();
@@ -165,15 +235,10 @@ export default function App() {
     }
   };
 
-  // --- POLLING AUTOMATICO IN BACKGROUND ---
   useEffect(() => {
     if (token) {
-      fetchMissions(); // Scarica subito al login
-      
-      // Avvia l'intervallo per aggiornare la Sidebar ogni 5 secondi
+      fetchMissions();
       const intervalId = setInterval(fetchMissions, 5000);
-      
-      // Cleanup: spegne il timer se l'utente si disconnette o smonta il componente
       return () => clearInterval(intervalId);
     }
   }, [token]);
@@ -185,7 +250,7 @@ export default function App() {
   return (
     <div className="h-screen w-screen bg-neutral-900 text-white flex p-2 gap-2 font-sans overflow-hidden relative">
       
-      {/* IL PANNELLO ADMIN (Passiamo fetchMissions come callback per il refresh istantaneo) */}
+      {/* PANNELLO ADMIN */}
       {showAdminPanel && (
         <AdminPanel 
           token={token} 
@@ -194,7 +259,7 @@ export default function App() {
         />
       )}
 
-      {/* POP-UP MODAL */}
+      {/* MODALE DETTAGLI E AUTORIZZAZIONI */}
       {showDetailsModal && activeMission && (
         <MissionModal 
           activeMission={activeMission}
@@ -208,23 +273,28 @@ export default function App() {
         />
       )}
 
-      {/* SEZIONE CENTRALE E SINISTRA */}
-      <MapPanel 
-        activeMission={activeMission} 
-        mapCenter={mapCenter} 
+      {/* PANNELLO CENTRALE (Mappa) */}
+      <MapPanel
+        activeMission={activeMission}
+        mapCenter={mapCenter}
+        token={token}
       />
 
-      {/* SEZIONE DESTRA (Sidebar) */}
+      {/* SIDEBAR DESTRA */}
       <Sidebar 
         userRole={userRole}
         onOpenAdmin={() => setShowAdminPanel(true)}
         handleLogout={handleLogout}
         serverMissions={serverMissions}
         activeMission={activeMission}
-        setActiveMission={setActiveMission}
+        setActiveMission={(mission) => {
+          // Quando si seleziona una missione dal DB, assicuriamoci di mantenere sia i waypoints per Leaflet che il payload MQTT
+          setActiveMission(mission);
+        }}
         setMissionPhase={setMissionPhase}
         setShowDetailsModal={setShowDetailsModal}
         emergencyProtocols={emergencyProtocols}
+        onEmergencyAction={handleEmergencyAction}
       />
     </div>
   );

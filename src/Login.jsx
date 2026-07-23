@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from './config';
 
 export default function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
@@ -17,7 +18,7 @@ export default function Login({ onLoginSuccess }) {
       formData.append('username', username);
       formData.append('password', password);
 
-      const response = await fetch('http://localhost:8000/login', {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -31,10 +32,10 @@ export default function Login({ onLoginSuccess }) {
         // Se il login va a buon fine, passiamo token e ruolo al componente genitore
         onLoginSuccess(data.access_token, data.role);
       } else {
-        setError(data.detail || 'Credenziali non valide');
+        setError(data.detail || 'Invalid credentials');
       }
     } catch (err) {
-      setError('Errore di connessione al server Control Room');
+      setError('Connection error to the Control Room server');
     } finally {
       setIsLoading(false);
     }
@@ -58,7 +59,7 @@ export default function Login({ onLoginSuccess }) {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Operatore ID
+              Operator ID
             </label>
             <input
               type="text"
@@ -91,7 +92,7 @@ export default function Login({ onLoginSuccess }) {
                 : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
             }`}
           >
-            {isLoading ? 'Autenticazione in corso...' : 'INIZIALIZZA CONNESSIONE'}
+            {isLoading ? 'Authenticating...' : 'INITIALIZE CONNECTION'}
           </button>
         </form>
         

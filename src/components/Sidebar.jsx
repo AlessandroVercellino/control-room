@@ -10,23 +10,24 @@ export default function Sidebar({
   setActiveMission,
   setMissionPhase,
   setShowDetailsModal,
-  emergencyProtocols
+  emergencyProtocols,
+  onEmergencyAction
 }) {
   return (
     <div className="w-96 flex flex-col gap-2">
      {/* HEADER UTENTE */}
       <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-3 flex justify-between items-center">
         <span className="text-sm">
-          Ruolo: <span className="text-blue-400 uppercase font-bold">{userRole}</span>
+          Role: <span className="text-blue-400 uppercase font-bold">{userRole}</span>
         </span>
         <div className="flex gap-2">
           {userRole === 'responsabile' && (
             <button onClick={onOpenAdmin} className="bg-yellow-600/80 hover:bg-yellow-600 text-xs px-2 py-1 rounded transition border border-yellow-700">
-              ⚙️ Admin
+              Admin
             </button>
           )}
           <button onClick={handleLogout} className="bg-red-900/80 hover:bg-red-800 text-xs px-2 py-1 rounded transition border border-red-700">
-            Disconnetti
+            Log Out
           </button>
         </div>
       </div>
@@ -34,12 +35,12 @@ export default function Sidebar({
       {/* LISTA MISSIONI */}
       <div className="h-[55%] bg-neutral-800 border border-neutral-700 rounded-lg p-4 flex flex-col gap-2 overflow-y-auto">
         <div className="flex justify-between items-center border-b border-neutral-600 pb-2 mb-2">
-           <h2 className="text-yellow-400 font-bold">Missioni dal Database</h2>
-           <button onClick={() => { setActiveMission(null); setMissionPhase('IDLE'); }} className="text-xs bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded transition">Pulisci Mappa</button>
+           <h2 className="text-yellow-400 font-bold">Missions from Database</h2>
+           <button onClick={() => { setActiveMission(null); setMissionPhase('IDLE'); }} className="text-xs bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded transition">Clear Map</button>
         </div>
-        
+
         {serverMissions.length === 0 ? (
-          <div className="text-neutral-500 text-sm italic text-center p-4">Nessuna missione trovata.</div>
+          <div className="text-neutral-500 text-sm italic text-center p-4">No missions found.</div>
         ) : (
           serverMissions.map((mission) => {
             
@@ -52,16 +53,18 @@ export default function Sidebar({
               onClick={() => {
                 // SE È BLOCCATA DAL RADAR, FERMIAMO IL CLICK
                 if (isBlocked) {
-                  alert(`🚨 ACCESSO NEGATO: La missione "${mission.route}" incrocia la No-Fly Zone attiva "${mission.blocked_by}".`);
+                  alert(`ACCESS DENIED: Mission "${mission.route}" intersects the active No-Fly Zone "${mission.blocked_by}".`);
                   return;
                 }
 
                 // Altrimenti, seleziona normalmente
-                setActiveMission({
-                  id: mission.mission_id,
-                  name: mission.route,
-                  color: "cyan",
-                  waypoints: mission.waypoints,
+                // Dentro Sidebar.jsx al click sulla missione:
+                 setActiveMission({
+                 id: mission.mission_id,
+                 name: mission.route,
+                 color: "cyan",
+                 waypoints: mission.waypoints,
+                 mqtt_payload: mission.mqtt_payload, // <-- IMPORTANTE: Passa il payload fornito dal backend Python!
                   details: mission.details 
                 });
                 setMissionPhase('IDLE');
@@ -90,7 +93,7 @@ export default function Sidebar({
               </div>
 
               <div className="text-xs text-neutral-400 mt-2 flex justify-between items-end">
-                <span>Piattaforma: <span className="text-white font-mono bg-neutral-800 px-1 rounded">{mission.drone}</span></span>
+                <span>Platform: <span className="text-white font-mono bg-neutral-800 px-1 rounded">{mission.drone}</span></span>
                 {/* Se è bloccata, mostra chi è il colpevole */}
                 {isBlocked && (
                   <span className="text-red-500 font-bold text-[10px]">
@@ -108,7 +111,7 @@ export default function Sidebar({
                     }}
                     className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 rounded text-xs transition shadow flex items-center justify-center gap-1"
                   >
-                    📄 Apri Scheda Tecnica e Autorizzazioni
+                    Open Technical Sheet & Authorizations
                   </button>
                 </div>
               )}
@@ -121,7 +124,7 @@ export default function Sidebar({
       {userRole !== "spettatore" && (
       <div className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg p-4 flex flex-col overflow-y-auto">
         <h2 className="text-red-500 font-bold mb-3 border-b border-red-900/50 pb-2 flex items-center gap-2">
-          🚨 Protocolli Failsafe
+          Failsafe Protocols
         </h2>
         <div className="flex flex-col gap-2">
           {emergencyProtocols.map((protocol) => (
@@ -131,9 +134,9 @@ export default function Sidebar({
                 if (protocol.type === "route") {
                   setActiveMission(protocol);
                 } else {
-                  alert(`Comando inviato al drone: ${protocol.name}`);
+                  onEmergencyAction(protocol);
                 }
-              }} 
+              }}
               className={`text-left font-bold py-3 px-3 rounded-lg w-full transition-all border shadow-sm ${
                 activeMission?.id === protocol.id 
                   ? 'bg-red-600 border-red-300 text-white ring-2 ring-red-400' 
@@ -141,7 +144,6 @@ export default function Sidebar({
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-lg">{protocol.type === "route" ? "🗺️" : "⚡"}</span> 
                 <span className="text-sm">{protocol.id} - {protocol.name}</span>
               </div>
             </button>

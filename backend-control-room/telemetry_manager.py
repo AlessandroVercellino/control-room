@@ -1,7 +1,11 @@
 # telemetry_manager.py
+import os
 import asyncio
 import paho.mqtt.client as mqtt
 from fastapi import WebSocket
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ==========================================
 # 📡 GESTORE WEBSOCKET (Il "Ponte" verso React)
@@ -34,9 +38,10 @@ fastapi_loop = None
 # 🚁 CLIENT MQTT (Ascolto dal Drone)
 # ==========================================
 MQTT_BROKER = "127.0.0.1" # IP dell'onboard computer
-MQTT_PORT = 1883
-MQTT_USER = "mqtt"
-MQTT_PASS = "password"
+MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
+MQTT_USER = os.environ.get("MQTT_USERNAME", "mqtt")
+MQTT_PASS = os.environ.get("MQTT_PASSWORD", "password")
+# Esportati così main.py può usare le stesse credenziali per il client di publish
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("✅ Connesso al broker MQTT del Drone!")

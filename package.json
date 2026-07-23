@@ -16,9 +16,7 @@
     "lucide-react": "^1.17.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.17.0",
-    "zustand": "^5.0.14"
+    "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,14 +1,26 @@
+import os
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, create_engine, JSON, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from datetime import datetime
 from geoalchemy2 import Geometry # Il modulo per usare PostGIS!
+from dotenv import load_dotenv
 
-# URL di connessione a PostgreSQL (da personalizzare con la tua password locale o server)
-DATABASE_URL = "postgresql://admin:admin@localhost:5432/control_room_db"
+load_dotenv()
+
+# URL di connessione a PostgreSQL, letto da .env (vedi .env.example)
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://admin:admin@localhost:5432/control_room_db")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+def get_db():
+    """Dependency FastAPI: una sessione DB per richiesta, chiusa sempre a fine richiesta."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # --- DATI LENTI (RELAZIONALI) ---
 
@@ -36,8 +48,12 @@ class FlightPlan(Base):
     file_path = Column(String, nullable=False)
     # Salviamo i waypoint non come testo, ma come LINESTRING geografica (una linea che unisce punti GPS)
     # 4326 è l'SRID (Spatial Reference System Identifier) standard per GPS WGS84 (Lat/Lon)
-    route_geometry = Column(Geometry(geometry_type='LINESTRING', srid=4326)) 
+    route_geometry = Column(Geometry(geometry_type='LINESTRING', srid=4326))
     details = Column(String)
+    # Waypoint già estratti dal file UgCS al momento dell'upload: {"leaflet_points": [...], "mqtt_mission_array": [...]}.
+    # Popolata una sola volta in upload_mission ed è la fonte di verità letta da GET /api/missions.
+    # file_path resta solo come backup del file originale, non serve più per disegnare la rotta.
+    waypoints_json = Column(JSON, nullable=True)
 
 class Mission(Base):
     __tablename__ = "missions"
@@ -47,6 +63,11 @@ class Mission(Base):
     pilot_id = Column(Integer, ForeignKey("users.id"))
     status = Column(String, default="PLANNED") # PLANNED, ACTIVE, COMPLETED, ABORTED
     start_timestamp = Column(DateTime, default=datetime.utcnow)
+
+    # Stato del workflow di autorizzazione Telegram (persistito: sopravvive a un riavvio del backend)
+    pilot_approved = Column(Boolean, default=False)
+    manager_approved = Column(Boolean, default=False)
+    pilot_rejected = Column(Boolean, default=False)
 
     # Relazioni per navigare agilmente in Python (es: mission.drone.name)
     plan = relationship("FlightPlan")

@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+.env
+uploaded_missions/
+uploaded_nfz/

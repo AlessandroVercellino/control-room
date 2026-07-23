@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminNFZManager from './AdminNFZManager';
+import { API_BASE_URL } from '../config';
 
 export default function AdminPanel({ token, onClose,onMissionUploaded }) {
   // Stati per scaricare i dati necessari dai menu a tendina
@@ -19,45 +20,52 @@ export default function AdminPanel({ token, onClose,onMissionUploaded }) {
   const [selectedNfzFile, setSelectedNfzFile] = useState(null);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/users').then(res => res.json()).then(setUsers);
-    fetch('http://127.0.0.1:8000/api/drones').then(res => res.json()).then(setDrones);
-  }, []);
+    const authHeaders = { headers: { "Authorization": `Bearer ${token}` } };
+    fetch(`${API_BASE_URL}/api/users`, authHeaders).then(res => res.json()).then(setUsers);
+    fetch(`${API_BASE_URL}/api/drones`, authHeaders).then(res => res.json()).then(setDrones);
+  }, [token]);
 
   // --- GESTIONE INVIO DATI ---
 
   const handleUserSubmit = async (e) => {
     e.preventDefault();
-    const response = await fetch('http://127.0.0.1:8000/api/users', {
+    const response = await fetch(`${API_BASE_URL}/api/users`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(userForm)
     });
-    
+
     if (response.ok) {
-        alert(`Utente ${userForm.full_name} aggiunto!`);
+        alert(`User ${userForm.full_name} added!`);
         setUserForm({ full_name: '', badge_code: '', codice_fiscale: '', role: 'pilota', password: '' });
-        fetch('http://127.0.0.1:8000/api/users').then(res => res.json()).then(setUsers);
+        fetch(`${API_BASE_URL}/api/users`, { headers: { "Authorization": `Bearer ${token}` } }).then(res => res.json()).then(setUsers);
     } else {
-        alert("Errore durante la creazione dell'utente. Controlla che Badge o CF non siano già registrati.");
+        alert("Error creating the user. Check that the badge code or fiscal code aren't already registered.");
     }
   };
 
   const handleDroneSubmit = async (e) => {
     e.preventDefault();
-    await fetch('http://127.0.0.1:8000/api/drones', {
+    await fetch(`${API_BASE_URL}/api/drones`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(droneForm)
     });
-    alert(`Drone ${droneForm.name} aggiunto alla flotta!`);
+    alert(`Drone ${droneForm.name} added to the fleet!`);
     setDroneForm({ name: '', hardware_serial: '', payload_sensors: '' });
-    fetch('http://127.0.0.1:8000/api/drones').then(res => res.json()).then(setDrones);
+    fetch(`${API_BASE_URL}/api/drones`, { headers: { "Authorization": `Bearer ${token}` } }).then(res => res.json()).then(setDrones);
   };
 
   const handleMissionSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
-      alert("Devi selezionare un file JSON di UgCS!");
+      alert("You must select a UgCS JSON file!");
       return;
     }
 
@@ -67,19 +75,20 @@ export default function AdminPanel({ token, onClose,onMissionUploaded }) {
     formData.append('pilot_id', missionForm.pilot_id);
     formData.append('file', selectedFile);
 
-    const response = await fetch('http://127.0.0.1:8000/api/missions/upload', {
+    const response = await fetch(`${API_BASE_URL}/api/missions/upload`, {
       method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
       body: formData,
     });
     
     if(response.ok) {
-        alert("Missione caricata nel Database e pronta al volo!");
+        alert("Mission uploaded to the database and ready for flight!");
         setMissionForm({ route_name: '', drone_id: '', pilot_id: '' });
         setSelectedFile(null);
         if(onMissionUploaded) onMissionUploaded(); // Notifica al componente genitore che una missione è stata caricata
     } else {
         const errorData = await response.json();
-        alert(errorData.detail || "Errore durante il caricamento della missione");
+        alert(errorData.detail || "Error uploading the mission");
     }
   };
 
@@ -87,7 +96,7 @@ export default function AdminPanel({ token, onClose,onMissionUploaded }) {
   const handleNfzSubmit = async (e) => {
     e.preventDefault();
     if (!selectedNfzFile) {
-      alert("Devi selezionare il file JSON della No-Fly Zone!");
+      alert("You must select the No-Fly Zone JSON file!");
       return;
     }
 
@@ -96,18 +105,18 @@ export default function AdminPanel({ token, onClose,onMissionUploaded }) {
     formData.append('description', nfzForm.description);
     formData.append('file', selectedNfzFile);
 
-    const response = await fetch('http://127.0.0.1:8000/api/nfz/upload', {
+    const response = await fetch(`${API_BASE_URL}/api/nfz/upload`, {
       method: 'POST',
       body: formData,
     });
     
     if(response.ok) {
-        alert(`No-Fly Zone "${nfzForm.name}" attivata con successo!`);
+        alert(`No-Fly Zone "${nfzForm.name}" successfully activated!`);
         setNfzForm({ name: '', description: '' });
         setSelectedNfzFile(null);
     } else {
         const errorData = await response.json();
-        alert(errorData.detail || "Errore durante l'attivazione della NFZ");
+        alert(errorData.detail || "Error activating the No-Fly Zone");
     }
   };
 
@@ -117,9 +126,9 @@ export default function AdminPanel({ token, onClose,onMissionUploaded }) {
         
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8 border-b border-neutral-700 pb-4">
-          <h1 className="text-3xl font-bold text-white">⚙️ Pannello di Amministrazione Database</h1>
+          <h1 className="text-3xl font-bold text-white">Database Administration Panel</h1>
           <button onClick={onClose} className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-bold transition">
-            Chiudi e Torna alla Mappa
+            Close and Return to Map
           </button>
         </div>
 
@@ -127,73 +136,73 @@ export default function AdminPanel({ token, onClose,onMissionUploaded }) {
           
           {/* COLONNA 1: UTENTI */}
            <div className="bg-neutral-800 border border-neutral-700 p-5 rounded-xl shadow-lg">
-            <h2 className="text-xl text-blue-400 font-bold mb-4">👤 Nuovo Utente</h2>
+            <h2 className="text-xl text-blue-400 font-bold mb-4">New User</h2>
             <form onSubmit={handleUserSubmit} className="flex flex-col gap-3">
-              <input required type="text" placeholder="Nome Cognome" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={userForm.full_name} onChange={e => setUserForm({...userForm, full_name: e.target.value})} />
-              <input required type="text" placeholder="Codice Fiscale" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600 uppercase" value={userForm.codice_fiscale} onChange={e => setUserForm({...userForm, codice_fiscale: e.target.value.toUpperCase()})} />
-              <input required type="text" placeholder="Codice Badge (User)" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={userForm.badge_code} onChange={e => setUserForm({...userForm, badge_code: e.target.value})} />
-              <input required type="password" placeholder="Password Accesso" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} />
-              
+              <input required type="text" placeholder="Full Name" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={userForm.full_name} onChange={e => setUserForm({...userForm, full_name: e.target.value})} />
+              <input required type="text" placeholder="Fiscal Code" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600 uppercase" value={userForm.codice_fiscale} onChange={e => setUserForm({...userForm, codice_fiscale: e.target.value.toUpperCase()})} />
+              <input required type="text" placeholder="Badge Code (User)" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={userForm.badge_code} onChange={e => setUserForm({...userForm, badge_code: e.target.value})} />
+              <input required type="password" placeholder="Access Password" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} />
+
               <select className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})}>
-              <option value="pilota">Pilota Uas</option>
-              <option value="responsabile">Responsabile Sala</option>
-              <option value="spettatore">Spettatore</option>
+              <option value="pilota">UAS Pilot</option>
+              <option value="responsabile">Room Manager</option>
+              <option value="spettatore">Observer</option>
               </select>
-              <button type="submit" className="bg-blue-600 text-white font-bold p-2 rounded hover:bg-blue-500 transition mt-2">Salva Utente</button>
+              <button type="submit" className="bg-blue-600 text-white font-bold p-2 rounded hover:bg-blue-500 transition mt-2">Save User</button>
            </form>
           </div>
 
           {/* COLONNA 2: DRONI */}
           <div className="bg-neutral-800 border border-neutral-700 p-5 rounded-xl shadow-lg">
-            <h2 className="text-xl text-green-400 font-bold mb-4">🚁 Registra Drone</h2>
+            <h2 className="text-xl text-green-400 font-bold mb-4">Register Drone</h2>
             <form onSubmit={handleDroneSubmit} className="flex flex-col gap-3">
-              <input required type="text" placeholder="Modello (es. DJI Matrice 300)" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={droneForm.name} onChange={e => setDroneForm({...droneForm, name: e.target.value})} />
-              <input required type="text" placeholder="Seriale Hardware" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={droneForm.hardware_serial} onChange={e => setDroneForm({...droneForm, hardware_serial: e.target.value})} />
-              <input type="text" placeholder="Sensori Payload" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={droneForm.payload_sensors} onChange={e => setDroneForm({...droneForm, payload_sensors: e.target.value})} />
-              <button type="submit" className="bg-green-600 text-white font-bold p-2 rounded hover:bg-green-500 transition mt-2">Salva Drone</button>
+              <input required type="text" placeholder="Model (e.g. DJI Matrice 300)" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={droneForm.name} onChange={e => setDroneForm({...droneForm, name: e.target.value})} />
+              <input required type="text" placeholder="Hardware Serial" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={droneForm.hardware_serial} onChange={e => setDroneForm({...droneForm, hardware_serial: e.target.value})} />
+              <input type="text" placeholder="Payload Sensors" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={droneForm.payload_sensors} onChange={e => setDroneForm({...droneForm, payload_sensors: e.target.value})} />
+              <button type="submit" className="bg-green-600 text-white font-bold p-2 rounded hover:bg-green-500 transition mt-2">Save Drone</button>
             </form>
           </div>
 
           {/* COLONNA 3: CARICAMENTO MISSIONI */}
           <div className="bg-neutral-800 border border-neutral-700 p-5 rounded-xl shadow-lg">
-            <h2 className="text-xl text-yellow-400 font-bold mb-4">🗺️ Upload Mission (UgCS)</h2>
+            <h2 className="text-xl text-yellow-400 font-bold mb-4">Upload Mission (UgCS)</h2>
             <form onSubmit={handleMissionSubmit} className="flex flex-col gap-3">
-              <input required type="text" placeholder="Nome della Rotta" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={missionForm.route_name} onChange={e => setMissionForm({...missionForm, route_name: e.target.value})} />
-              
+              <input required type="text" placeholder="Route Name" className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={missionForm.route_name} onChange={e => setMissionForm({...missionForm, route_name: e.target.value})} />
+
               <select required className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={missionForm.pilot_id} onChange={e => setMissionForm({...missionForm, pilot_id: e.target.value})}>
-                <option value="">-- Seleziona Pilota Incaricato --</option>
+                <option value="">-- Select Assigned Pilot --</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>)}
               </select>
 
               <select required className="bg-neutral-900 text-white p-2 rounded border border-neutral-600" value={missionForm.drone_id} onChange={e => setMissionForm({...missionForm, drone_id: e.target.value})}>
-                <option value="">-- Seleziona Drone --</option>
+                <option value="">-- Select Drone --</option>
                 {drones.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
 
               <div className="border-2 border-dashed border-neutral-500 rounded-lg p-4 text-center mt-2 bg-neutral-900 relative hover:bg-neutral-800 transition">
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept=".json"
                   onChange={e => setSelectedFile(e.target.files[0])}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 <div className="text-neutral-400 pointer-events-none">
                   {selectedFile ? (
-                    <span className="text-yellow-400 font-bold">📄 {selectedFile.name}</span>
+                    <span className="text-yellow-400 font-bold">{selectedFile.name}</span>
                   ) : (
-                    <span>Clicca o trascina il file .json</span>
+                    <span>Click or drag the .json file</span>
                   )}
                 </div>
               </div>
 
-              <button type="submit" className="bg-yellow-600 text-white font-bold p-2 rounded hover:bg-yellow-500 transition mt-2">Carica nel Database</button>
+              <button type="submit" className="bg-yellow-600 text-white font-bold p-2 rounded hover:bg-yellow-500 transition mt-2">Upload to Database</button>
             </form>
           </div>
         </div>
       
       {/* SEZIONE NO-FLY ZONE */}
       <div className="mt-8">
-        <AdminNFZManager />
+        <AdminNFZManager token={token} />
       </div>
 
       </div>
